@@ -252,7 +252,7 @@ model News {
   summary     String?  @db.Text
   body        String?  @db.Text
   imageUrl    String?
-  url         String
+  url         String   @unique
   source      String
   publishedAt DateTime
   teamId      String?
