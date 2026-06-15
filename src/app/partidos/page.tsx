@@ -13,7 +13,7 @@ import { TeamFlag } from '@/components/team-flag'
 function groupByDate(matches: Parameters<typeof MatchCard>[0]['match'][]) {
   return matches.reduce((acc, match) => {
     // Use UTC date string as key to avoid timezone shifts on the server
-    const key = match.kickoffAt.toISOString().split('T')[0]
+    const key = new Date(match.kickoffAt.getTime() - 6 * 3600 * 1000).toISOString().split('T')[0]  // use CDMX date, not UTC
     if (!acc[key]) acc[key] = []
     acc[key].push(match)
     return acc

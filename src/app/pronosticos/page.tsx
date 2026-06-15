@@ -39,7 +39,7 @@ export default async function PronosticosPage() {
   // Group matches by date label
   type Match = typeof matches[0]
   const grouped = matches.reduce<Record<string, Match[]>>((acc, m) => {
-    const key = m.kickoffAt.toISOString().split('T')[0]
+    const key = new Date(m.kickoffAt.getTime() - 6 * 3600 * 1000).toISOString().split('T')[0]  // use CDMX date, not UTC
     if (!acc[key]) acc[key] = []
     acc[key].push(m)
     return acc
