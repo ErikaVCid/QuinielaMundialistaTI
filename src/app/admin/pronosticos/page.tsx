@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { formatMatchDate, formatMatchTime } from '@/lib/utils'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
+import { TeamFlag } from '@/components/team-flag'
 
 export default async function AdminPronosticosPage() {
   const session = await auth()
@@ -39,7 +40,7 @@ export default async function AdminPronosticosPage() {
                     <div className="text-xs text-gray-600">{formatMatchDate(match.kickoffAt).split(' ').slice(0, 2).join(' ')}</div>
                   </div>
                   <div className="text-sm font-medium text-white">
-                    {match.homeTeam.flag} {match.homeTeam.code} vs {match.awayTeam.flag} {match.awayTeam.code}
+                    <><TeamFlag team={match.homeTeam} size="xs" /> {match.homeTeam.code} vs <TeamFlag team={match.awayTeam} size="xs" /> {match.awayTeam.code}</>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 flex-shrink-0">

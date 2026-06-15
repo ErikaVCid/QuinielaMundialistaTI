@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { TeamFlag } from '@/components/team-flag'
 import { redirect, notFound } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { formatMatchDate, formatMatchTime } from '@/lib/utils'
@@ -39,7 +40,7 @@ export default async function MatchPredictionsPage({
         <div className="text-center mb-3 text-xs text-gray-500">{formatMatchDate(match.kickoffAt)} · {formatMatchTime(match.kickoffAt)}</div>
         <div className="flex items-center justify-center gap-6">
           <div className="text-center">
-            <div className="text-3xl mb-1">{match.homeTeam.flag}</div>
+            <div className="mb-2 flex justify-center"><TeamFlag team={match.homeTeam} size="lg" /></div>
             <div className="text-white font-bold">{match.homeTeam.code}</div>
           </div>
           <div className="text-center">
@@ -50,7 +51,7 @@ export default async function MatchPredictionsPage({
             )}
           </div>
           <div className="text-center">
-            <div className="text-3xl mb-1">{match.awayTeam.flag}</div>
+            <div className="mb-2 flex justify-center"><TeamFlag team={match.awayTeam} size="lg" /></div>
             <div className="text-white font-bold">{match.awayTeam.code}</div>
           </div>
         </div>

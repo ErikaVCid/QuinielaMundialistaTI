@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { TeamFlag } from '@/components/team-flag'
 import { Loader2, Save, RefreshCw } from 'lucide-react'
 
 interface MatchData {
@@ -97,7 +98,7 @@ function MatchResultRow({ match, onSave, isSaving }: {
     <div className="bg-[#111118] rounded-xl border border-[#1e1e2e] p-4">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-lg">{match.homeTeam.flag}</span>
+          <TeamFlag team={match.homeTeam} size="sm" />
           <span className="text-sm font-medium text-white">{match.homeTeam.code}</span>
           <div className="flex items-center gap-1 mx-2">
             <input type="number" min={0} max={20} value={homeScore} onChange={e => setHomeScore(+e.target.value)}
@@ -107,7 +108,7 @@ function MatchResultRow({ match, onSave, isSaving }: {
               className="w-12 text-center bg-[#1a1a24] border border-[#2e2e3e] rounded-lg text-white py-1 text-sm font-bold" />
           </div>
           <span className="text-sm font-medium text-white">{match.awayTeam.code}</span>
-          <span className="text-lg">{match.awayTeam.flag}</span>
+          <TeamFlag team={match.awayTeam} size="sm" />
         </div>
         <div className="flex items-center gap-2">
           <select value={status} onChange={e => setStatus(e.target.value)}

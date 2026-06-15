@@ -2,8 +2,9 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Save, Lock } from 'lucide-react'
+import { TeamFlag } from '@/components/team-flag'
 
-interface Team { id: string; name: string; flag: string | null; code: string }
+interface Team { id: string; name: string; flag: string | null; badge?: string | null; code: string }
 interface PredictionData { homeScore: number; awayScore: number; isLocked: boolean }
 
 interface Props {
@@ -46,11 +47,11 @@ export function PredictionForm({ matchId, participantId, homeTeam, awayTeam, exi
     return (
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-lg">{homeTeam.flag}</span>
+          <TeamFlag team={homeTeam} size="sm" />
           <span className="text-xl font-bold text-white tabular-nums">{existingPrediction.homeScore}</span>
           <span className="text-gray-500">–</span>
           <span className="text-xl font-bold text-white tabular-nums">{existingPrediction.awayScore}</span>
-          <span className="text-lg">{awayTeam.flag}</span>
+          <TeamFlag team={awayTeam} size="sm" />
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-500">
           <Lock className="w-3 h-3" /> Pronóstico guardado
@@ -92,14 +93,14 @@ export function PredictionForm({ matchId, participantId, homeTeam, awayTeam, exi
     <form onSubmit={handleSubmit}>
       <div className="flex items-center justify-center gap-6 mb-6">
         <div className="flex flex-col items-center gap-1">
-          <span className="text-2xl">{homeTeam.flag}</span>
+          <TeamFlag team={homeTeam} size="md" />
           <span className="text-xs text-gray-400">{homeTeam.code}</span>
         </div>
         <ScoreInput value={homeScore} onChange={setHomeScore} label={homeTeam.name} />
         <span className="text-gray-500 text-xl">–</span>
         <ScoreInput value={awayScore} onChange={setAwayScore} label={awayTeam.name} />
         <div className="flex flex-col items-center gap-1">
-          <span className="text-2xl">{awayTeam.flag}</span>
+          <TeamFlag team={awayTeam} size="md" />
           <span className="text-xs text-gray-400">{awayTeam.code}</span>
         </div>
       </div>

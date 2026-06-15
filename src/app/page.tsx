@@ -6,18 +6,7 @@ import { formatMatchTime, phaseLabel } from '@/lib/utils'
 import { Trophy, Target, Calendar, TrendingUp, ChevronRight, Zap } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-
-// ── Flag helper ────────────────────────────────────────────────────────────────
-
-function Flag({ flag, name, size = 'md' }: { flag: string | null; name: string; size?: 'sm' | 'md' | 'lg' }) {
-  const cls = size === 'lg' ? 'w-10 h-auto' : size === 'md' ? 'w-7 h-auto' : 'w-5 h-auto'
-  if (!flag) return <span className="inline-block w-7 h-5 rounded bg-[#2e2e3e]" />
-  if (flag.startsWith('http')) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={flag} alt={name} className={`${cls} rounded-sm object-cover flex-shrink-0 inline-block`} />
-  }
-  return <span className={size === 'lg' ? 'text-3xl' : size === 'md' ? 'text-xl' : 'text-base'}>{flag}</span>
-}
+import { TeamFlag } from '@/components/team-flag'
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
@@ -113,7 +102,7 @@ export default async function HomePage() {
                     {/* Home */}
                     <div className="flex-1 flex items-center justify-end gap-2">
                       <span className="text-sm font-bold text-white truncate">{match.homeTeam.name}</span>
-                      <Flag flag={match.homeTeam.flag} name={match.homeTeam.name} size="md" />
+                      <TeamFlag team={match.homeTeam} size="md" />
                     </div>
                     {/* Score */}
                     <div className="text-center px-3">
@@ -123,7 +112,7 @@ export default async function HomePage() {
                     </div>
                     {/* Away */}
                     <div className="flex-1 flex items-center justify-start gap-2">
-                      <Flag flag={match.awayTeam.flag} name={match.awayTeam.name} size="md" />
+                      <TeamFlag team={match.awayTeam} size="md" />
                       <span className="text-sm font-bold text-white truncate">{match.awayTeam.name}</span>
                     </div>
                   </div>
@@ -183,7 +172,7 @@ export default async function HomePage() {
                     {/* Home — right aligned */}
                     <div className="flex items-center justify-end gap-2 min-w-0">
                       <span className="text-sm font-semibold text-white truncate">{match.homeTeam.name}</span>
-                      <Flag flag={match.homeTeam.flag} name={match.homeTeam.name} size="sm" />
+                      <TeamFlag team={match.homeTeam} size="sm" />
                     </div>
 
                     {/* VS */}
@@ -193,7 +182,7 @@ export default async function HomePage() {
 
                     {/* Away — left aligned */}
                     <div className="flex items-center justify-start gap-2 min-w-0">
-                      <Flag flag={match.awayTeam.flag} name={match.awayTeam.name} size="sm" />
+                      <TeamFlag team={match.awayTeam} size="sm" />
                       <span className="text-sm font-semibold text-white truncate">{match.awayTeam.name}</span>
                     </div>
 

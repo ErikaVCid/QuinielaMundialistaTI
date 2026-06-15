@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { formatMatchTime } from '@/lib/utils'
 import { Trophy, Target, TrendingUp, Calendar } from 'lucide-react'
 import { EditProfileForm } from '@/components/edit-profile-form'
+import { TeamFlag } from '@/components/team-flag'
 
 export default async function PerfilPage() {
   const session = await auth()
@@ -68,7 +69,7 @@ export default async function PerfilPage() {
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-gray-400">{formatMatchTime(pred.match.kickoffAt)}</span>
                 <span className="text-white font-medium">
-                  {pred.match.homeTeam.flag} {pred.match.homeTeam.code} vs {pred.match.awayTeam.flag} {pred.match.awayTeam.code}
+                  <><TeamFlag team={pred.match.homeTeam} size="xs" /> {pred.match.homeTeam.code} vs <TeamFlag team={pred.match.awayTeam} size="xs" /> {pred.match.awayTeam.code}</>
                 </span>
               </div>
               <div className="flex items-center gap-3">

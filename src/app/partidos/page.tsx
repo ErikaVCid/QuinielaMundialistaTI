@@ -7,23 +7,7 @@ import { Zap, Target } from 'lucide-react'
 import { Phase, MatchStatus } from '@prisma/client'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-
-function TeamFlag({ flag, name }: { flag: string | null; name: string }) {
-  if (!flag) return <span className="w-8 h-6 rounded bg-[#2e2e3e] flex-shrink-0" />
-  if (flag.startsWith('http')) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={flag}
-        alt={name}
-        width={32}
-        height={22}
-        className="w-8 h-auto rounded-sm object-cover flex-shrink-0"
-      />
-    )
-  }
-  return <span className="text-xl leading-none flex-shrink-0">{flag}</span>
-}
+import { TeamFlag } from '@/components/team-flag'
 
 function groupByDate(matches: Parameters<typeof MatchCard>[0]['match'][]) {
   return matches.reduce((acc, match) => {
@@ -81,7 +65,7 @@ function MatchCard({ match }: { match: MatchWithTeams }) {
           <div className="flex-1 px-4 py-3 space-y-2.5">
             {/* Home team */}
             <div className="flex items-center gap-2.5">
-              <TeamFlag flag={match.homeTeam.flag} name={match.homeTeam.name} />
+              <TeamFlag team={match.homeTeam} size="sm" />
               <span className={`flex-1 text-sm ${homeWins ? 'text-white font-semibold' : 'text-gray-300'}`}>
                 {match.homeTeam.name}
               </span>
@@ -95,7 +79,7 @@ function MatchCard({ match }: { match: MatchWithTeams }) {
 
             {/* Away team */}
             <div className="flex items-center gap-2.5">
-              <TeamFlag flag={match.awayTeam.flag} name={match.awayTeam.name} />
+              <TeamFlag team={match.awayTeam} size="sm" />
               <span className={`flex-1 text-sm ${awayWins ? 'text-white font-semibold' : 'text-gray-300'}`}>
                 {match.awayTeam.name}
               </span>

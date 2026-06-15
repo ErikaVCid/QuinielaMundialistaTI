@@ -8,19 +8,7 @@ import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { FillWeekButton } from '@/components/fill-week-button'
-
-// ── Flag helper ───────────────────────────────────────────────────────────────
-
-function TeamFlag({ flag, name }: { flag: string | null; name: string }) {
-  if (!flag) return <span className="inline-block w-6 h-4 rounded bg-[#2e2e3e] flex-shrink-0" />
-  if (flag.startsWith('http')) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={flag} alt={name} width={24} className="inline-block w-6 h-auto rounded-sm object-cover flex-shrink-0" />
-    )
-  }
-  return <span className="text-lg leading-none flex-shrink-0">{flag}</span>
-}
+import { TeamFlag } from '@/components/team-flag'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -97,11 +85,11 @@ export default async function PronosticosPage() {
             {withoutPrediction.slice(0, 4).map((m) => (
               <Link key={m.id} href={`/partidos/${m.id}`}
                 className="flex items-center gap-1.5 text-xs bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 px-2.5 py-1.5 rounded-lg hover:bg-yellow-500/20 transition-all">
-                <TeamFlag flag={m.homeTeam.flag} name={m.homeTeam.name} />
+                <TeamFlag team={m.homeTeam} size="xs" />
                 <span className="font-medium">{m.homeTeam.code}</span>
                 <span className="text-yellow-700">–</span>
                 <span className="font-medium">{m.awayTeam.code}</span>
-                <TeamFlag flag={m.awayTeam.flag} name={m.awayTeam.name} />
+                <TeamFlag team={m.awayTeam} size="xs" />
               </Link>
             ))}
             {withoutPrediction.length > 4 && (
@@ -167,7 +155,7 @@ export default async function PronosticosPage() {
                           <span className="text-sm font-semibold text-white truncate text-right">
                             {match.homeTeam.name}
                           </span>
-                          <TeamFlag flag={match.homeTeam.flag} name={match.homeTeam.name} />
+                          <TeamFlag team={match.homeTeam} size="sm" />
                         </div>
 
                         {/* Center: score or VS */}
@@ -194,7 +182,7 @@ export default async function PronosticosPage() {
 
                         {/* Away team — left aligned */}
                         <div className="flex items-center justify-start gap-2 min-w-0">
-                          <TeamFlag flag={match.awayTeam.flag} name={match.awayTeam.name} />
+                          <TeamFlag team={match.awayTeam} size="sm" />
                           <span className="text-sm font-semibold text-white truncate">
                             {match.awayTeam.name}
                           </span>

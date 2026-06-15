@@ -5,6 +5,7 @@ import { ExternalLink, Zap, Trophy } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { TeamFlag } from '@/components/team-flag'
 
 function ScoreBadge({ title }: { title: string }) {
   // Extract score from title like "Mexico 2-0 South Africa"
@@ -110,17 +111,10 @@ export default async function NoticiasPage() {
 // ── Card components ────────────────────────────────────────────────────────────
 
 type NewsItem = Awaited<ReturnType<typeof prisma.news.findMany>>[0] & {
-  match: ({ homeTeam: { flag: string | null; name: string }; awayTeam: { flag: string | null; name: string } } | null)
+  match: ({ homeTeam: { flag: string | null; badge: string | null; name: string }; awayTeam: { flag: string | null; badge: string | null; name: string } } | null)
 }
 
-function TeamFlag({ flag, name }: { flag: string | null; name: string }) {
-  if (!flag) return null
-  if (flag.startsWith('http')) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={flag} alt={name} className="w-5 h-auto rounded-sm inline-block" />
-  }
-  return <span className="text-base">{flag}</span>
-}
+
 
 function NewsCard({ n, variant }: { n: NewsItem; variant: 'featured' | 'list' }) {
   const isLocal = n.source === 'Quiniela Mundial 2026'
@@ -136,13 +130,13 @@ function NewsCard({ n, variant }: { n: NewsItem; variant: 'featured' | 'list' })
           <div className="bg-gradient-to-r from-green-900/30 to-[#0d0d17] border-b border-[#1e1e2e] px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TeamFlag flag={n.match.homeTeam.flag} name={n.match.homeTeam.name} />
+                <TeamFlag team={n.match.homeTeam} size="xs" />
                 <span className="text-xs font-semibold text-white">{n.match.homeTeam.name}</span>
               </div>
               <ScoreBadge title={n.title} />
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-white">{n.match.awayTeam.name}</span>
-                <TeamFlag flag={n.match.awayTeam.flag} name={n.match.awayTeam.name} />
+                <TeamFlag team={n.match.awayTeam} size="xs" />
               </div>
             </div>
           </div>
@@ -175,9 +169,9 @@ function NewsCard({ n, variant }: { n: NewsItem; variant: 'featured' | 'list' })
       {/* Teams mini badge */}
       {n.match ? (
         <div className="flex items-center gap-1.5 flex-shrink-0 w-28">
-          <TeamFlag flag={n.match.homeTeam.flag} name={n.match.homeTeam.name} />
+          <TeamFlag team={n.match.homeTeam} size="xs" />
           <ScoreBadge title={n.title} />
-          <TeamFlag flag={n.match.awayTeam.flag} name={n.match.awayTeam.name} />
+          <TeamFlag team={n.match.awayTeam} size="xs" />
         </div>
       ) : n.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element

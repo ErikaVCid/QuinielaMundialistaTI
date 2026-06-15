@@ -1,13 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { TeamFlag } from '@/components/team-flag'
 
 interface LiveMatch {
   id: string
   homeScore: number | null
   awayScore: number | null
   status: string
-  homeTeam: { name: string; flag: string | null; code: string }
-  awayTeam: { name: string; flag: string | null; code: string }
+  homeTeam: { name: string; flag: string | null; badge?: string | null; code: string }
+  awayTeam: { name: string; flag: string | null; badge?: string | null; code: string }
 }
 
 export function LiveScores() {
@@ -47,11 +48,11 @@ export function LiveScores() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {liveMatches.map((m) => (
           <div key={m.id} className="flex items-center justify-between bg-black/20 rounded-lg px-4 py-2">
-            <span className="text-sm text-white">{m.homeTeam.flag} {m.homeTeam.code}</span>
+            <span className="text-sm text-white flex items-center gap-1.5"><TeamFlag team={m.homeTeam} size="xs" />{m.homeTeam.code}</span>
             <span className="text-xl font-bold text-white tabular-nums px-3">
               {m.homeScore ?? 0} – {m.awayScore ?? 0}
             </span>
-            <span className="text-sm text-white">{m.awayTeam.code} {m.awayTeam.flag}</span>
+            <span className="text-sm text-white flex items-center gap-1.5">{m.awayTeam.code}<TeamFlag team={m.awayTeam} size="xs" /></span>
           </div>
         ))}
       </div>
