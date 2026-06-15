@@ -102,12 +102,12 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label htmlFor="role" className="block text-sm font-medium text-gray-300 mb-1.5">Rol</label>
-            <select id="role" name="role"
-              className="w-full px-3.5 py-2.5 rounded-lg bg-[#1a1a24] border border-[#2e2e3e] text-white focus:outline-none focus:border-green-500/50 text-sm">
-              <option value="USER">Usuario (quiniela)</option>
-              <option value="ADMIN">Administrador</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Rol</label>
+            <div className="w-full px-3.5 py-2.5 rounded-lg bg-[#1a1a24] border border-[#2e2e3e] text-gray-400 text-sm flex items-center gap-2">
+              <span>Usuario (quiniela)</span>
+              <span className="ml-auto text-xs text-gray-600">Solo el admin principal puede ser administrador</span>
+            </div>
+            <input type="hidden" name="role" value="USER" />
           </div>
 
           <div className="flex gap-3 pt-2">

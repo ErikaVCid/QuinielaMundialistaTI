@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
   }
 
-  const { name, displayName, email, password, role } = await req.json() as {
+  const { name, displayName, email, password } = await req.json() as {
     name: string; displayName: string; email: string; password: string; role?: string
   }
 
@@ -25,13 +25,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Ya existe un usuario con ese correo' }, { status: 409 })
   }
 
+  // Only the protected admin can have ADMIN role — creation always yields USER
   const hashedPassword = await bcrypt.hash(password, 12)
   const user = await prisma.user.create({
     data: {
       name,
       email,
       password: hashedPassword,
-      role: role === 'ADMIN' ? 'ADMIN' : 'USER',
+      role: 'USER',
     },
   })
 
