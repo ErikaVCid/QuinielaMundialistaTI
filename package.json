@@ -16,7 +16,8 @@
     "sync:sm:discover": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-sportmonks.ts discover",
     "predictions:generate": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/generate-predictions.ts",
     "cron:dev": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/cron-dev.ts",
-    "news:generate": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/generate-news.ts"
+    "news:generate": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/generate-news.ts",
+    "sync:tsdb": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-thesportsdb.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

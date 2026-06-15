@@ -128,6 +128,8 @@ model Team {
   name        String
   code        String  @unique
   flag        String?
+  badge       String?  // HD team crest from TheSportsDB
+  tsdbId      String?  // TheSportsDB team ID
   fifaRanking Int?
   externalId  String?
   groupId     String?
@@ -166,10 +168,14 @@ model Match {
   phase        Phase       @default(GROUP)
   groupId      String?
   status       MatchStatus @default(SCHEDULED)
-  matchday     Int?
-  round        String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  matchday         Int?
+  round            String?
+  highlightUrl     String?
+  posterUrl        String?
+  attendees        Int?
+  matchDescription String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   homeTeam     Team             @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeam     Team             @relation("AwayTeam", fields: [awayTeamId], references: [id])
