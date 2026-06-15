@@ -424,17 +424,167 @@ export class ApiFootballProvider implements FootballDataProvider {
 
 // --- Factory ---
 
+// --- Sportmonks v3 provider ---
+
+interface SmFixture {
+  id: number
+  state_id: number
+  starting_at: string
+  venue_id: number | null
+  participants?: SmParticipant[]
+  scores?: SmScore[]
+  venue?: SmVenue
+  round?: { name: string }
+  stage?: { name: string }
+}
+
+interface SmParticipant {
+  id: number
+  name: string
+  short_code: string
+  image_path: string
+  meta: { location: 'home' | 'away'; winner: boolean | null; position: number | null }
+}
+
+interface SmScore {
+  type_id: number
+  participant_id: number
+  score: { goals: number; participant: 'home' | 'away' }
+  description: string   // "CURRENT" | "HT" | "FT" | "ET" | "2ND_HALF" …
+}
+
+interface SmVenue {
+  id: number
+  name: string
+  city_name: string | null
+  country?: { name: string }
+}
+
+// state_id → match status
+const SM_LIVE_STATES = new Set([3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14])
+const SM_DONE_STATES = new Set([15, 16, 17, 21])
+const SM_POST_STATES = new Set([18, 19, 20])
+
+function smStatus(stateId: number): MatchData['status'] {
+  if (SM_LIVE_STATES.has(stateId)) return 'LIVE'
+  if (SM_DONE_STATES.has(stateId)) return 'FINISHED'
+  if (SM_POST_STATES.has(stateId)) return 'POSTPONED'
+  return 'SCHEDULED'
+}
+
+function smRoundToPhase(round?: string, stage?: string): Phase {
+  const r = (round ?? stage ?? '').toLowerCase()
+  if (r.includes('group')) return Phase.GROUP
+  if (r.includes('round of 16') || r.includes('last 16') || r.includes('1/8')) return Phase.ROUND_OF_16
+  if (r.includes('quarter')) return Phase.QUARTER_FINAL
+  if (r.includes('semi')) return Phase.SEMI_FINAL
+  if (r.includes('3rd') || r.includes('third') || r.includes('place')) return Phase.THIRD_PLACE
+  if (r.includes('final')) return Phase.FINAL
+  return Phase.GROUP
+}
+
+export class SportmonksProvider implements FootballDataProvider {
+  static readonly BASE = 'https://api.sportmonks.com/v3/football'
+  readonly apiKey: string
+  readonly seasonId: string
+
+  constructor() {
+    this.apiKey = process.env.SPORTMONKS_API_KEY ?? ''
+    this.seasonId = process.env.SPORTMONKS_SEASON_ID ?? ''
+  }
+
+  private async req<T>(path: string): Promise<{ data: T; pagination?: { has_more: boolean; next_page: string | null } }> {
+    const url = `${SportmonksProvider.BASE}${path}`
+    const res = await fetch(url, {
+      headers: { Authorization: this.apiKey },
+      next: { revalidate: 60 },
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(`Sportmonks ${res.status}: ${body.substring(0, 200)}`)
+    }
+    return res.json() as Promise<{ data: T; pagination?: { has_more: boolean; next_page: string | null } }>
+  }
+
+  // Auto-paginate through all pages
+  private async fetchAll<T>(path: string): Promise<T[]> {
+    const includes = 'participants;scores;venue;round'
+    const sep = path.includes('?') ? '&' : '?'
+    let url = `${path}${sep}include=${includes}&per_page=50&page=1`
+    const all: T[] = []
+
+    while (url) {
+      const data = await this.req<T[]>(url)
+      all.push(...data.data)
+      url = data.pagination?.has_more && data.pagination.next_page
+        ? data.pagination.next_page.replace(SportmonksProvider.BASE, '')
+        : ''
+    }
+    return all
+  }
+
+  private mapFixture(f: SmFixture): MatchData | null {
+    const home = f.participants?.find(p => p.meta.location === 'home')
+    const away = f.participants?.find(p => p.meta.location === 'away')
+    if (!home || !away) return null
+
+    // Get current score (description="CURRENT" or fall back to any score entry)
+    const currentScores = f.scores?.filter(s => s.description === 'CURRENT') ?? []
+    const homeScore = currentScores.find(s => s.score.participant === 'home')?.score.goals
+    const awayScore = currentScores.find(s => s.score.participant === 'away')?.score.goals
+
+    return {
+      externalId: `sm-${f.id}`,
+      homeTeamCode: home.short_code || home.name.substring(0, 3).toUpperCase(),
+      awayTeamCode: away.short_code || away.name.substring(0, 3).toUpperCase(),
+      kickoffAt: new Date(f.starting_at),
+      stadium: f.venue?.name ?? undefined,
+      city: f.venue?.city_name ?? undefined,
+      homeScore,
+      awayScore,
+      status: smStatus(f.state_id),
+      phase: smRoundToPhase(f.round?.name, f.stage?.name),
+    }
+  }
+
+  // Helper: list seasons to find the WC 2026 season ID
+  async findWorldCupSeason(): Promise<{ id: number; name: string; leagueId: number }[]> {
+    const data = await this.req<Array<{ id: number; name: string; league_id: number }>>(
+      '/seasons?filters[seasonLeagueIds]=8'   // league 8 = FIFA World Cup in Sportmonks
+    )
+    return (Array.isArray(data.data) ? data.data : []).map(s => ({
+      id: s.id,
+      name: s.name,
+      leagueId: s.league_id,
+    }))
+  }
+
+  async getMatches(): Promise<MatchData[]> {
+    if (!this.seasonId) throw new Error('SPORTMONKS_SEASON_ID not set — run npm run sync:sm:discover first')
+    const fixtures = await this.fetchAll<SmFixture>(`/fixtures/seasons/${this.seasonId}`)
+    return fixtures.map(f => this.mapFixture(f)).filter((m): m is MatchData => m !== null)
+  }
+
+  async getLiveScores(): Promise<MatchData[]> {
+    const fixtures = await this.fetchAll<SmFixture>('/livescores/inplay')
+    return fixtures.map(f => this.mapFixture(f)).filter((m): m is MatchData => m !== null)
+  }
+
+  async getMatchStats(_externalId: string): Promise<Record<string, unknown>> { return {} }
+}
+
 export function createFootballProvider(): FootballDataProvider {
-  // API_FOOTBALL_KEY takes priority (user-supplied variable name)
-  if (process.env.API_FOOTBALL_KEY) {
+  // Sportmonks takes priority if configured
+  if (process.env.SPORTMONKS_API_KEY) {
+    return new SportmonksProvider()
+  }
+  // api-football v3
+  if (process.env.API_FOOTBALL_KEY || process.env.FOOTBALL_API_KEY) {
     return new ApiFootballProvider()
   }
   const provider = process.env.FOOTBALL_API_PROVIDER ?? 'mock'
   if (provider === 'worldcup26' && process.env.WORLDCUP26_TOKEN) {
     return new WorldCup26Provider()
-  }
-  if (provider === 'api-football' && process.env.FOOTBALL_API_KEY) {
-    return new ApiFootballProvider()
   }
   return new MockFootballProvider()
 }
