@@ -1,8 +1,9 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { TrendingUp, TrendingDown, Minus, Medal } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Medal, ChevronRight } from 'lucide-react'
 
 export default async function PosicionesPage() {
   const session = await auth()
@@ -102,11 +103,12 @@ export default async function PosicionesPage() {
           const change = getPositionChange(p.rank, p.positionPrev)
           const isMe = p.userId === session.user?.id
           return (
-            <div
+            <Link
               key={p.id}
+              href={`/posiciones/${p.id}`}
               className={cn(
-                'grid grid-cols-12 gap-2 px-4 py-3 text-sm border-b border-[#1e1e2e] last:border-0 transition-colors',
-                isMe ? 'bg-green-500/5' : 'hover:bg-white/[0.02]',
+                'grid grid-cols-12 gap-2 px-4 py-3 text-sm border-b border-[#1e1e2e] last:border-0 transition-colors group',
+                isMe ? 'bg-green-500/5 hover:bg-green-500/10' : 'hover:bg-white/[0.03]',
                 p.rank === 1 ? 'border-l-2 border-l-amber-500' : '',
               )}
             >
@@ -125,10 +127,11 @@ export default async function PosicionesPage() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/20 to-blue-500/20 border border-[#2e2e3e] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
                   {p.displayName.charAt(0).toUpperCase()}
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className={cn('font-medium truncate', isMe ? 'text-green-400' : 'text-white')}>
                     {p.displayName} {isMe && <span className="text-xs text-green-500">(tú)</span>}
                   </div>
+                  <div className="text-xs text-gray-600">{p._count.predictions} pronósticos</div>
                 </div>
               </div>
               <div className="col-span-2 flex items-center justify-center">
@@ -140,7 +143,7 @@ export default async function PosicionesPage() {
               <div className="col-span-2 flex items-center justify-center">
                 <span className="text-blue-400">{p.resultHits}</span>
               </div>
-              <div className="col-span-1 flex items-center justify-center">
+              <div className="col-span-1 flex items-center justify-end gap-1">
                 {change > 0 ? (
                   <TrendingUp className="w-4 h-4 text-green-400" />
                 ) : change < 0 ? (
@@ -148,8 +151,9 @@ export default async function PosicionesPage() {
                 ) : (
                   <Minus className="w-4 h-4 text-gray-600" />
                 )}
+                <ChevronRight className="w-3.5 h-3.5 text-gray-700 group-hover:text-gray-400 hidden md:block" />
               </div>
-            </div>
+            </Link>
           )
         })}
 

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { Shield, User } from 'lucide-react'
 import { UserActions } from './user-actions'
+import { CreateUserButton } from '@/components/create-user-form'
 
 export default async function AdminUsuariosPage() {
   const session = await auth()
@@ -15,9 +16,12 @@ export default async function AdminUsuariosPage() {
 
   return (
     <div className="pt-16 md:pt-0 p-4 md:p-8 max-w-5xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">Gestión de Usuarios</h1>
-        <p className="text-gray-400 text-sm">{users.length} usuarios registrados</p>
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">Gestión de Usuarios</h1>
+          <p className="text-gray-400 text-sm">{users.length} usuarios registrados</p>
+        </div>
+        <CreateUserButton />
       </div>
 
       <div className="bg-[#111118] rounded-xl border border-[#1e1e2e] overflow-hidden">
