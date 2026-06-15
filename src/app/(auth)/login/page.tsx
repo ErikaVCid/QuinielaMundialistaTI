@@ -49,7 +49,7 @@ export default function LoginPage() {
             ⚽
           </div>
           <h1 className="text-2xl font-bold text-white">Quiniela</h1>
-          <p className="text-green-400 font-semibold text-sm tracking-wider uppercase">Mundial 2026</p>
+          <p className="text-green-400 font-semibold text-sm tracking-wider uppercase">Mundial México 2026</p>
         </div>
 
         {/* Card */}
@@ -109,12 +109,18 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-500">
-            ¿No tienes cuenta?{' '}
-            <Link href="/registro" className="text-green-400 hover:text-green-300 font-medium">
-              Regístrate
-            </Link>
-          </p>
+          <div className="mt-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-[#2e2e3e]" />
+            <span className="text-xs text-gray-600">o</span>
+            <div className="h-px flex-1 bg-[#2e2e3e]" />
+          </div>
+
+          <Link
+            href="/registro"
+            className="mt-4 flex w-full items-center justify-center py-2.5 rounded-lg border border-[#2e2e3e] hover:border-green-500/40 text-gray-300 hover:text-white text-sm font-semibold transition-all hover:bg-green-500/5"
+          >
+            Crear cuenta nueva
+          </Link>
         </div>
 
         {/* Demo credentials hint */}

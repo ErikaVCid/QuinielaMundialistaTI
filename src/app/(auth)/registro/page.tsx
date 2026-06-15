@@ -47,7 +47,7 @@ export default function RegistroPage() {
             ⚽
           </div>
           <h1 className="text-2xl font-bold text-white">Crear cuenta</h1>
-          <p className="text-green-400 font-semibold text-sm tracking-wider uppercase">Mundial 2026</p>
+          <p className="text-green-400 font-semibold text-sm tracking-wider uppercase">Mundial México 2026</p>
         </div>
 
         <div className="bg-[#111118] rounded-2xl border border-[#1e1e2e] p-8 shadow-2xl">

@@ -5,6 +5,15 @@ import { formatMatchDate, formatMatchTime, phaseLabel, isMatchLocked } from '@/l
 import { PredictionForm } from '@/components/prediction-form'
 import { MapPin, Clock, Trophy, Users } from 'lucide-react'
 
+function TeamFlag({ flag, name }: { flag: string | null; name: string }) {
+  if (!flag) return <span className="text-5xl">🏳️</span>
+  if (flag.startsWith('http')) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={flag} alt={name} className="w-16 h-auto rounded object-cover mx-auto" />
+  }
+  return <span className="text-5xl">{flag}</span>
+}
+
 export default async function MatchDetailPage({
   params,
 }: {
@@ -60,7 +69,9 @@ export default async function MatchDetailPage({
         {/* Teams and Score */}
         <div className="flex items-center justify-between gap-4 py-4">
           <div className="flex-1 text-center">
-            <div className="text-5xl mb-2">{match.homeTeam.flag}</div>
+            <div className="mb-3 flex justify-center">
+              <TeamFlag flag={match.homeTeam.flag} name={match.homeTeam.name} />
+            </div>
             <div className="text-lg font-bold text-white">{match.homeTeam.name}</div>
             <div className="text-sm text-gray-400">{match.homeTeam.code}</div>
           </div>
@@ -86,7 +97,9 @@ export default async function MatchDetailPage({
           </div>
 
           <div className="flex-1 text-center">
-            <div className="text-5xl mb-2">{match.awayTeam.flag}</div>
+            <div className="mb-3 flex justify-center">
+              <TeamFlag flag={match.awayTeam.flag} name={match.awayTeam.name} />
+            </div>
             <div className="text-lg font-bold text-white">{match.awayTeam.name}</div>
             <div className="text-sm text-gray-400">{match.awayTeam.code}</div>
           </div>

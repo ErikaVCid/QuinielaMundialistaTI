@@ -7,8 +7,8 @@ import { Navigation } from '@/components/navigation'
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 
 export const metadata: Metadata = {
-  title: 'Quiniela Mundial 2026',
-  description: 'La quiniela oficial del Mundial FIFA 2026',
+  title: 'Quiniela Mundial México 2026',
+  description: 'La quiniela oficial del Mundial FIFA México 2026',
 }
 
 export default function RootLayout({

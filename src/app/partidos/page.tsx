@@ -2,9 +2,149 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
-import { formatMatchDate, formatMatchTime, phaseLabel } from '@/lib/utils'
-import { Target, Zap, CheckCircle, Clock } from 'lucide-react'
+import { formatMatchTime, phaseLabel } from '@/lib/utils'
+import { Zap, Target } from 'lucide-react'
 import { Phase, MatchStatus } from '@prisma/client'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
+
+function TeamFlag({ flag, name }: { flag: string | null; name: string }) {
+  if (!flag) return <span className="w-8 h-6 rounded bg-[#2e2e3e] flex-shrink-0" />
+  if (flag.startsWith('http')) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={flag}
+        alt={name}
+        width={32}
+        height={22}
+        className="w-8 h-auto rounded-sm object-cover flex-shrink-0"
+      />
+    )
+  }
+  return <span className="text-xl leading-none flex-shrink-0">{flag}</span>
+}
+
+function groupByDate(matches: Parameters<typeof MatchCard>[0]['match'][]) {
+  return matches.reduce((acc, match) => {
+    const key = format(new Date(match.kickoffAt), 'yyyy-MM-dd')
+    if (!acc[key]) acc[key] = []
+    acc[key].push(match)
+    return acc
+  }, {} as Record<string, typeof matches>)
+}
+
+type MatchWithTeams = {
+  id: string
+  kickoffAt: Date
+  status: string
+  homeScore: number | null
+  awayScore: number | null
+  matchday: number | null
+  phase: string
+  stadium: string | null
+  city: string | null
+  homeTeam: { name: string; code: string; flag: string | null }
+  awayTeam: { name: string; code: string; flag: string | null }
+  group: { label: string } | null
+}
+
+function MatchCard({ match }: { match: MatchWithTeams }) {
+  const isLive = match.status === 'LIVE'
+  const isFinished = match.status === 'FINISHED'
+  const hasScore = isLive || isFinished
+
+  const homeWins = hasScore && match.homeScore !== null && match.awayScore !== null && match.homeScore > match.awayScore
+  const awayWins = hasScore && match.homeScore !== null && match.awayScore !== null && match.awayScore > match.homeScore
+
+  const groupLabel = match.group ? `Grupo ${match.group.label}` : phaseLabel(match.phase)
+  const matchdayLabel = match.matchday ? ` · Jornada ${match.matchday}` : ''
+
+  const shortDate = format(new Date(match.kickoffAt), "EEE, d MMM", { locale: es })
+  const time = formatMatchTime(match.kickoffAt)
+
+  return (
+    <Link href={`/partidos/${match.id}`} className="block group">
+      <div className={`
+        bg-[#111118] rounded-xl border transition-all duration-150
+        group-hover:border-green-500/30 group-hover:bg-[#131320]
+        ${isLive ? 'border-red-500/40' : 'border-[#1e1e2e]'}
+      `}>
+        {/* Group / phase label */}
+        <div className="px-4 pt-3 pb-2 text-xs text-gray-500 font-medium border-b border-[#1e1e2e]">
+          {groupLabel}{matchdayLabel}
+        </div>
+
+        <div className="flex">
+          {/* Teams column */}
+          <div className="flex-1 px-4 py-3 space-y-2.5">
+            {/* Home team */}
+            <div className="flex items-center gap-2.5">
+              <TeamFlag flag={match.homeTeam.flag} name={match.homeTeam.name} />
+              <span className={`flex-1 text-sm ${homeWins ? 'text-white font-semibold' : 'text-gray-300'}`}>
+                {match.homeTeam.name}
+              </span>
+              {hasScore && (
+                <span className={`text-base font-bold tabular-nums w-5 text-right ${homeWins ? 'text-white' : 'text-gray-400'}`}>
+                  {match.homeScore}
+                </span>
+              )}
+              {homeWins && <span className="text-green-400 text-xs">◀</span>}
+            </div>
+
+            {/* Away team */}
+            <div className="flex items-center gap-2.5">
+              <TeamFlag flag={match.awayTeam.flag} name={match.awayTeam.name} />
+              <span className={`flex-1 text-sm ${awayWins ? 'text-white font-semibold' : 'text-gray-300'}`}>
+                {match.awayTeam.name}
+              </span>
+              {hasScore && (
+                <span className={`text-base font-bold tabular-nums w-5 text-right ${awayWins ? 'text-white' : 'text-gray-400'}`}>
+                  {match.awayScore}
+                </span>
+              )}
+              {awayWins && <span className="text-green-400 text-xs">◀</span>}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="w-px bg-[#1e1e2e] self-stretch" />
+
+          {/* Time / status column */}
+          <div className="w-24 flex flex-col items-center justify-center px-3 py-3 gap-1 flex-shrink-0">
+            {isLive ? (
+              <>
+                <span className="flex items-center gap-1 text-red-400 text-xs font-bold">
+                  <Zap className="w-3 h-3" /> EN VIVO
+                </span>
+              </>
+            ) : isFinished ? (
+              <>
+                <span className="text-gray-400 text-xs font-medium">Fin</span>
+                <span className="text-gray-500 text-xs">{shortDate}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-white text-sm font-bold">{time}</span>
+                <span className="text-gray-500 text-xs">{shortDate}</span>
+                <span className="flex items-center gap-1 text-green-400 text-xs font-medium mt-1">
+                  <Target className="w-3 h-3" /> Pronóstico
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Stadium footer */}
+        {(match.stadium || match.city) && (
+          <div className="px-4 py-2 border-t border-[#1e1e2e] text-xs text-gray-600 truncate">
+            {[match.stadium, match.city].filter(Boolean).join(', ')}
+          </div>
+        )}
+      </div>
+    </Link>
+  )
+}
 
 export default async function PartidosPage({
   searchParams,
@@ -27,125 +167,74 @@ export default async function PartidosPage({
     orderBy: { kickoffAt: 'asc' },
   })
 
-  // Group by date
-  const grouped = matches.reduce((acc, match) => {
-    const date = formatMatchDate(match.kickoffAt)
-    if (!acc[date]) acc[date] = []
-    acc[date].push(match)
-    return acc
-  }, {} as Record<string, typeof matches>)
-
-  const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string }> = {
-    SCHEDULED: { label: 'Programado', icon: Clock, color: 'text-gray-400' },
-    LIVE: { label: 'En Vivo', icon: Zap, color: 'text-red-400' },
-    FINISHED: { label: 'Finalizado', icon: CheckCircle, color: 'text-green-400' },
-    POSTPONED: { label: 'Pospuesto', icon: Clock, color: 'text-yellow-400' },
-  }
-
   const groups = await prisma.tournamentGroup.findMany({ orderBy: { label: 'asc' } })
+  const grouped = groupByDate(matches)
+
+  const filterBtn = (href: string, active: boolean, label: string, icon?: React.ReactNode) => (
+    <Link
+      href={href}
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 whitespace-nowrap
+        ${active
+          ? href.includes('LIVE') ? 'bg-red-600 text-white'
+            : href.includes('FINISHED') ? 'bg-gray-600 text-white'
+            : 'bg-green-600 text-white'
+          : 'bg-[#111118] border border-[#1e1e2e] text-gray-400 hover:text-white hover:border-gray-600'}`}
+    >
+      {icon}{label}
+    </Link>
+  )
 
   return (
     <div className="pt-16 md:pt-0 p-4 md:p-8 max-w-5xl">
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold text-white mb-1">Calendario de Partidos</h1>
-        <p className="text-gray-400 text-sm">Mundial FIFA 2026 — Del 15 de junio a la Final</p>
+        <p className="text-gray-500 text-sm">Mundial FIFA 2026 — Del 11 de junio a la Final</p>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <Link href="/partidos" className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!fase && !grupo && !estado ? 'bg-green-600 text-white' : 'bg-[#111118] border border-[#1e1e2e] text-gray-400 hover:text-white'}`}>
-          Todos
-        </Link>
-        <Link href="/partidos?estado=LIVE" className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${estado === 'LIVE' ? 'bg-red-600 text-white' : 'bg-[#111118] border border-[#1e1e2e] text-gray-400 hover:text-white'}`}>
-          <Zap className="w-3 h-3" /> En Vivo
-        </Link>
-        <Link href="/partidos?estado=SCHEDULED" className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${estado === 'SCHEDULED' ? 'bg-blue-600 text-white' : 'bg-[#111118] border border-[#1e1e2e] text-gray-400 hover:text-white'}`}>
-          Programados
-        </Link>
-        <Link href="/partidos?estado=FINISHED" className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${estado === 'FINISHED' ? 'bg-gray-600 text-white' : 'bg-[#111118] border border-[#1e1e2e] text-gray-400 hover:text-white'}`}>
-          Finalizados
-        </Link>
-        {groups.map((g) => (
-          <Link
-            key={g.id}
-            href={`/partidos?grupo=${g.label}`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${grupo === g.label ? 'bg-green-600 text-white' : 'bg-[#111118] border border-[#1e1e2e] text-gray-400 hover:text-white'}`}
-          >
-            Grupo {g.label}
-          </Link>
-        ))}
+        {filterBtn('/partidos', !fase && !grupo && !estado, 'Todos')}
+        {filterBtn('/partidos?estado=LIVE', estado === 'LIVE', 'En Vivo', <Zap className="w-3 h-3" />)}
+        {filterBtn('/partidos?estado=SCHEDULED', estado === 'SCHEDULED', 'Programados')}
+        {filterBtn('/partidos?estado=FINISHED', estado === 'FINISHED', 'Finalizados')}
+        {groups.map((g) =>
+          filterBtn(`/partidos?grupo=${g.label}`, grupo === g.label, `Grupo ${g.label}`)
+        )}
       </div>
 
       {/* Matches grouped by date */}
-      <div className="space-y-8">
-        {Object.entries(grouped).map(([date, dateMatches]) => (
-          <div key={date}>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <div className="h-px flex-1 bg-[#1e1e2e]" />
-              {date}
-              <div className="h-px flex-1 bg-[#1e1e2e]" />
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {dateMatches.map((match) => {
-                const sc = statusConfig[match.status] ?? statusConfig['SCHEDULED']
-                const StatusIcon = sc.icon
-                return (
-                  <Link key={match.id} href={`/partidos/${match.id}`}>
-                    <div className={`bg-[#111118] rounded-xl border p-4 match-card-hover cursor-pointer ${match.status === 'LIVE' ? 'border-red-500/30' : 'border-[#1e1e2e]'}`}>
-                      <div className="flex items-center justify-between text-xs mb-3">
-                        <span className="text-gray-500">
-                          {match.group ? `Grupo ${match.group.label}` : phaseLabel(match.phase)}
-                          {match.matchday && ` · Jornada ${match.matchday}`}
-                        </span>
-                        <span className={`flex items-center gap-1 ${sc.color} font-medium`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {match.status === 'LIVE' ? 'EN VIVO' : formatMatchTime(match.kickoffAt)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1 flex items-center gap-2 justify-end">
-                          <div className="text-right">
-                            <div className="text-sm font-bold text-white">{match.homeTeam.name}</div>
-                            <div className="text-xs text-gray-500">{match.homeTeam.code}</div>
-                          </div>
-                          <span className="text-xl">{match.homeTeam.flag}</span>
-                        </div>
-                        <div className="text-center px-2">
-                          {match.status === 'FINISHED' || match.status === 'LIVE' ? (
-                            <div className="text-xl font-bold text-white tabular-nums">
-                              {match.homeScore} – {match.awayScore}
-                            </div>
-                          ) : (
-                            <div className="text-sm font-bold text-gray-500">VS</div>
-                          )}
-                        </div>
-                        <div className="flex-1 flex items-center gap-2">
-                          <span className="text-xl">{match.awayTeam.flag}</span>
-                          <div>
-                            <div className="text-sm font-bold text-white">{match.awayTeam.name}</div>
-                            <div className="text-xs text-gray-500">{match.awayTeam.code}</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-[#1e1e2e] flex items-center justify-between">
-                        <span className="text-xs text-gray-500">{match.stadium}, {match.city}</span>
-                        {match.status === 'SCHEDULED' && (
-                          <span className="text-xs text-green-400 font-medium flex items-center gap-1">
-                            <Target className="w-3 h-3" /> Pronóstico
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
+      <div className="space-y-6">
+        {Object.entries(grouped).map(([dateKey, dateMatches]) => {
+          const dateLabel = format(new Date(dateKey), "d 'de' MMMM, yyyy", { locale: es }).toUpperCase()
+          // Determine phase label for the section
+          const firstMatch = dateMatches[0]
+          const sectionPhase = firstMatch.group
+            ? 'Fase de grupos'
+            : phaseLabel(firstMatch.phase)
+
+          return (
+            <div key={dateKey}>
+              {/* Section header */}
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xs font-medium text-gray-500 bg-[#0d0d14] px-3 py-1 rounded-full border border-[#1e1e2e]">
+                  {sectionPhase} · {dateLabel}
+                </span>
+                <div className="h-px flex-1 bg-[#1e1e2e]" />
+              </div>
+
+              {/* 2-column grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {dateMatches.map((match) => (
+                  <MatchCard key={match.id} match={match} />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {Object.keys(grouped).length === 0 && (
-        <div className="text-center py-16 text-gray-500">
+        <div className="text-center py-16 text-gray-500 text-sm">
           No se encontraron partidos con los filtros seleccionados.
         </div>
       )}
