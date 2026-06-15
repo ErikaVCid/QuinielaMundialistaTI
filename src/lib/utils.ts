@@ -1,18 +1,22 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, formatDistanceToNow, isAfter } from 'date-fns'
+import { formatDistanceToNow, isAfter } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 import { es } from 'date-fns/locale'
+
+// All times displayed in Mexico City timezone (CDT = UTC-5 in summer)
+const TZ = 'America/Mexico_City'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 export function formatMatchDate(date: Date | string): string {
-  return format(new Date(date), "d 'de' MMMM, yyyy", { locale: es })
+  return formatInTimeZone(new Date(date), TZ, "d 'de' MMMM, yyyy", { locale: es })
 }
 
 export function formatMatchTime(date: Date | string): string {
-  return format(new Date(date), 'HH:mm', { locale: es })
+  return formatInTimeZone(new Date(date), TZ, 'HH:mm', { locale: es })
 }
 
 export function formatRelativeTime(date: Date | string): string {

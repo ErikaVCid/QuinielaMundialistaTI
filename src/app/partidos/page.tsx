@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
+import { formatInTimeZone } from 'date-fns-tz'
 import { formatMatchTime, phaseLabel } from '@/lib/utils'
 import { Zap, Target } from 'lucide-react'
 import { Phase, MatchStatus } from '@prisma/client'
@@ -45,7 +46,7 @@ function MatchCard({ match }: { match: MatchWithTeams }) {
   const groupLabel = match.group ? `Grupo ${match.group.label}` : phaseLabel(match.phase)
   const matchdayLabel = match.matchday ? ` · Jornada ${match.matchday}` : ''
 
-  const shortDate = format(new Date(match.kickoffAt), "EEE, d MMM", { locale: es })
+  const shortDate = formatInTimeZone(new Date(match.kickoffAt), 'America/Mexico_City', "EEE, d MMM", { locale: es })
   const time = formatMatchTime(match.kickoffAt)
 
   return (

@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
+import { formatInTimeZone } from 'date-fns-tz'
 import { formatMatchTime } from '@/lib/utils'
 import { Trophy, Target, TrendingUp, Calendar, Star, ChevronRight } from 'lucide-react'
 import { EditProfileForm } from '@/components/edit-profile-form'
@@ -150,7 +151,7 @@ export default async function PerfilPage() {
           <div className="divide-y divide-[#1e1e2e]">
             {pending.slice(0, 8).map((pred) => {
               const m = pred.match
-              const d = format(new Date(m.kickoffAt), "EEE d MMM", { locale: es })
+              const d = formatInTimeZone(new Date(m.kickoffAt), 'America/Mexico_City', "EEE d MMM", { locale: es })
               return (
                 <Link key={pred.id} href={`/partidos/${m.id}`}
                   className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors group">
