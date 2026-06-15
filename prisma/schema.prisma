@@ -1,0 +1,285 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+}
+
+enum Phase {
+  GROUP
+  ROUND_OF_16
+  QUARTER_FINAL
+  SEMI_FINAL
+  THIRD_PLACE
+  FINAL
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  participant  Participant?
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model ParticipantGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  inviteCode  String   @unique @default(cuid())
+  createdById String
+  createdAt   DateTime @default(now())
+
+  participants Participant[]
+
+  @@map("participant_groups")
+}
+
+model Participant {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  displayName  String
+  avatarUrl    String?
+  bio          String?
+  groupId      String?
+  totalPoints  Int      @default(0)
+  exactHits    Int      @default(0)
+  resultHits   Int      @default(0)
+  pendingCount Int      @default(0)
+  position     Int?
+  positionPrev Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       ParticipantGroup? @relation(fields: [groupId], references: [id])
+  predictions Prediction[]
+  rankings    Ranking[]
+
+  @@map("participants")
+}
+
+model Team {
+  id          String  @id @default(cuid())
+  name        String
+  code        String  @unique
+  flag        String?
+  fifaRanking Int?
+  externalId  String?
+  groupId     String?
+
+  group       TournamentGroup? @relation(fields: [groupId], references: [id])
+  homeMatches Match[]          @relation("HomeTeam")
+  awayMatches Match[]          @relation("AwayTeam")
+  news        News[]
+
+  @@map("teams")
+}
+
+model TournamentGroup {
+  id    String @id @default(cuid())
+  name  String
+  label String
+
+  teams   Team[]
+  matches Match[]
+
+  @@map("tournament_groups")
+}
+
+model Match {
+  id         String      @id @default(cuid())
+  externalId String?     @unique
+  homeTeamId String
+  awayTeamId String
+  homeScore  Int?
+  awayScore  Int?
+  kickoffAt  DateTime
+  stadium    String?
+  city       String?
+  country    String?
+  phase      Phase       @default(GROUP)
+  groupId    String?
+  status     MatchStatus @default(SCHEDULED)
+  matchday   Int?
+  round      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  homeTeam    Team             @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam    Team             @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  group       TournamentGroup? @relation(fields: [groupId], references: [id])
+  predictions Prediction[]
+  news        News[]
+  rankings    Ranking[]
+
+  @@map("matches")
+}
+
+model Prediction {
+  id            String    @id @default(cuid())
+  participantId String
+  matchId       String
+  homeScore     Int
+  awayScore     Int
+  isLocked      Boolean   @default(false)
+  lockedAt      DateTime?
+  points        Int?
+  submittedAt   DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  participant Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  match       Match           @relation(fields: [matchId], references: [id])
+  logs        PredictionLog[]
+
+  @@unique([participantId, matchId])
+  @@map("predictions")
+}
+
+model PredictionLog {
+  id           String   @id @default(cuid())
+  predictionId String
+  prevHome     Int
+  prevAway     Int
+  newHome      Int
+  newAway      Int
+  changedAt    DateTime @default(now())
+
+  prediction Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  @@map("prediction_logs")
+}
+
+model ScoringRule {
+  id              String   @id @default(cuid())
+  name            String
+  exactScore      Int      @default(5)
+  correctResult   Int      @default(3)
+  goalDiff        Int      @default(1)
+  noMatch         Int      @default(0)
+  bonusMultiplier Float    @default(1.0)
+  applyFromPhase  Phase    @default(GROUP)
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@map("scoring_rules")
+}
+
+model Ranking {
+  id             String   @id @default(cuid())
+  participantId  String
+  matchId        String?
+  totalPoints    Int      @default(0)
+  exactHits      Int      @default(0)
+  resultHits     Int      @default(0)
+  position       Int
+  positionChange Int      @default(0)
+  calculatedAt   DateTime @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  match       Match?      @relation(fields: [matchId], references: [id])
+
+  @@map("rankings")
+}
+
+model News {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String?  @db.Text
+  body        String?  @db.Text
+  imageUrl    String?
+  url         String
+  source      String
+  publishedAt DateTime
+  teamId      String?
+  matchId     String?
+  isFeatured  Boolean  @default(false)
+  tags        String[]
+  createdAt   DateTime @default(now())
+
+  team  Team?  @relation(fields: [teamId], references: [id])
+  match Match? @relation(fields: [matchId], references: [id])
+
+  @@map("news")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
