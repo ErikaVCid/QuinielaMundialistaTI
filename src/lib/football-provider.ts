@@ -276,78 +276,146 @@ class NewsApiProvider implements NewsDataProvider {
 
 // --- api-football v3 provider ---
 
-interface ApiFixtureResponse {
+export interface ApiFixture {
   fixture: {
     id: number
     date: string
-    venue: { name: string | null; city: string | null }
-    status: { short: string }
+    venue: { id: number | null; name: string | null; city: string | null }
+    status: { long: string; short: string; elapsed: number | null }
   }
-  league: { round: string }
-  teams: { home: { name: string }; away: { name: string } }
+  league: {
+    id: number
+    season: number
+    round: string   // "Group Stage - 1", "Round of 16", "Quarter-finals", etc.
+  }
+  teams: {
+    home: { id: number; name: string; logo: string; winner: boolean | null }
+    away: { id: number; name: string; logo: string; winner: boolean | null }
+  }
   goals: { home: number | null; away: number | null }
+  score: {
+    halftime: { home: number | null; away: number | null }
+    fulltime: { home: number | null; away: number | null }
+    extratime: { home: number | null; away: number | null }
+    penalty: { home: number | null; away: number | null }
+  }
 }
 
 const LIVE_STATUSES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'INT'])
 const FINISHED_STATUSES = new Set(['FT', 'AET', 'PEN'])
 const POSTPONED_STATUSES = new Set(['PST', 'CANC', 'ABD', 'AWD', 'WO'])
 
-class ApiFootballProvider implements FootballDataProvider {
-  private apiKey: string
-  private leagueId: string
-  private season: string
+// api-football team name → FIFA 3-letter code
+const AF_NAME_TO_CODE: Record<string, string> = {
+  'Mexico': 'MEX', 'South Africa': 'RSA', 'South Korea': 'KOR', 'Czech Republic': 'CZE',
+  'Canada': 'CAN', 'Bosnia and Herzegovina': 'BIH', 'Qatar': 'QAT', 'Switzerland': 'SUI',
+  'Haiti': 'HAI', 'Scotland': 'SCO', 'Australia': 'AUS', 'Turkey': 'TUR',
+  'United States': 'USA', 'Panama': 'PAN', 'Iraq': 'IRQ', 'Norway': 'NOR',
+  'Brazil': 'BRA', 'Curaçao': 'CUW', 'Ivory Coast': 'CIV', 'Ecuador': 'ECU',
+  'Germany': 'GER', 'Netherlands': 'NED', 'Japan': 'JPN', 'Sweden': 'SWE',
+  'Tunisia': 'TUN', 'France': 'FRA', 'Senegal': 'SEN', 'Argentina': 'ARG',
+  'Algeria': 'ALG', 'Austria': 'AUT', 'Jordan': 'JOR', 'England': 'ENG',
+  'Croatia': 'CRO', 'Portugal': 'POR', 'DR Congo': 'COD', 'Uruguay': 'URU',
+  'Tahiti': 'TAH', 'Saudi Arabia': 'KSA', 'Morocco': 'MAR', 'Iran': 'IRN',
+  'New Zealand': 'NZL', 'Chile': 'CHI', 'Peru': 'PER', 'Colombia': 'COL',
+  'Belgium': 'BEL', 'Egypt': 'EGY', 'Serbia': 'SRB', 'Indonesia': 'IDN',
+  'Spain': 'ESP', 'Greece': 'GRE', 'Romania': 'ROU', 'Ghana': 'GHA',
+  'Uzbekistan': 'UZB', 'Hungary': 'HUN', 'Costa Rica': 'CRC', 'Cameroon': 'CMR',
+  'Nigeria': 'NGA', 'Italy': 'ITA', 'Paraguay': 'PAR', 'Kenya': 'KEN',
+  'Honduras': 'HON', 'Venezuela': 'VEN', 'Angola': 'ANG', 'Gambia': 'GAM',
+  'Trinidad and Tobago': 'TRI', 'Azerbaijan': 'AZE', 'Bolivia': 'BOL',
+}
 
-  constructor() {
-    this.apiKey = process.env.FOOTBALL_API_KEY ?? ''
-    this.leagueId = process.env.FOOTBALL_API_LEAGUE_ID ?? '1'
-    this.season = process.env.FOOTBALL_API_SEASON ?? '2026'
+function afTeamCode(name: string, id: number): string {
+  return AF_NAME_TO_CODE[name] ?? `AF${id}`
+}
+
+function afRoundToPhase(round: string): Phase {
+  const r = round.toLowerCase()
+  if (r.includes('group')) return Phase.GROUP
+  if (r.includes('round of 16') || r.includes('last 16')) return Phase.ROUND_OF_16
+  if (r.includes('quarter')) return Phase.QUARTER_FINAL
+  if (r.includes('semi')) return Phase.SEMI_FINAL
+  if (r.includes('3rd') || r.includes('third') || r.includes('place')) return Phase.THIRD_PLACE
+  if (r.includes('final')) return Phase.FINAL
+  return Phase.GROUP
+}
+
+function afGroupFromRound(_round: string): string | undefined {
+  // api-football doesn't expose the group letter in fixtures, only in standings
+  return undefined
+}
+
+export class ApiFootballProvider implements FootballDataProvider {
+  // Reads API_FOOTBALL_KEY (as provided by the user) OR legacy FOOTBALL_API_KEY
+  static apiKey(): string {
+    return process.env.API_FOOTBALL_KEY ?? process.env.FOOTBALL_API_KEY ?? ''
   }
 
-  private async fetch<T>(path: string): Promise<T> {
-    const res = await fetch(`https://v3.football.api-sports.io${path}`, {
-      headers: { 'x-apisports-key': this.apiKey },
+  private async req<T>(url: string): Promise<{ response: T; errors: unknown[]; results: number }> {
+    const res = await fetch(url, {
+      headers: { 'x-apisports-key': ApiFootballProvider.apiKey() },
       next: { revalidate: 60 },
     })
-    if (!res.ok) throw new Error(`api-football ${res.status} ${path}`)
-    const json = await res.json() as { response: T }
-    return json.response
+    if (!res.ok) throw new Error(`api-football ${res.status}: ${url}`)
+    return res.json() as Promise<{ response: T; errors: unknown[]; results: number }>
   }
 
-  private mapFixture(f: ApiFixtureResponse): MatchData {
+  async getRawFixtures(league = 1, season = 2026): Promise<ApiFixture[]> {
+    const data = await this.req<ApiFixture[]>(
+      `https://v3.football.api-sports.io/fixtures?league=${league}&season=${season}`
+    )
+    if (Array.isArray(data.errors) && data.errors.length > 0) {
+      throw new Error(`api-football errors: ${JSON.stringify(data.errors)}`)
+    }
+    return data.response
+  }
+
+  async getRawLiveFixtures(league = 1): Promise<ApiFixture[]> {
+    const data = await this.req<ApiFixture[]>(
+      `https://v3.football.api-sports.io/fixtures?live=all&league=${league}`
+    )
+    return data.response
+  }
+
+  private mapFixture(f: ApiFixture): MatchData {
     const short = f.fixture.status.short
     const status: MatchData['status'] = LIVE_STATUSES.has(short) ? 'LIVE'
       : FINISHED_STATUSES.has(short) ? 'FINISHED'
       : POSTPONED_STATUSES.has(short) ? 'POSTPONED'
       : 'SCHEDULED'
-    const round = f.league.round.toLowerCase()
-    const phase: Phase = round.includes('group') ? Phase.GROUP
-      : round.includes('16') ? Phase.ROUND_OF_16
-      : round.includes('quarter') ? Phase.QUARTER_FINAL
-      : round.includes('semi') ? Phase.SEMI_FINAL
-      : round.includes('3rd') || round.includes('third') ? Phase.THIRD_PLACE
-      : round.includes('final') ? Phase.FINAL
-      : Phase.GROUP
+
+    // Get score: prefer fulltime, fall back to goals (covers live)
+    const homeScore = f.score.fulltime.home ?? f.goals.home ?? undefined
+    const awayScore = f.score.fulltime.away ?? f.goals.away ?? undefined
+
+    // Matchday from round string: "Group Stage - 2" → 2
+    const matchdayMatch = f.league.round.match(/(\d+)$/)
+    const matchday = matchdayMatch ? parseInt(matchdayMatch[1]) : undefined
+
     return {
-      externalId: String(f.fixture.id),
-      homeTeamCode: f.teams.home.name.substring(0, 3).toUpperCase(),
-      awayTeamCode: f.teams.away.name.substring(0, 3).toUpperCase(),
+      externalId: `af-${f.fixture.id}`,
+      homeTeamCode: afTeamCode(f.teams.home.name, f.teams.home.id),
+      awayTeamCode: afTeamCode(f.teams.away.name, f.teams.away.id),
       kickoffAt: new Date(f.fixture.date),
       stadium: f.fixture.venue.name ?? undefined,
       city: f.fixture.venue.city ?? undefined,
-      homeScore: f.goals.home ?? undefined,
-      awayScore: f.goals.away ?? undefined,
+      homeScore: homeScore ?? undefined,
+      awayScore: awayScore ?? undefined,
       status,
-      phase,
+      phase: afRoundToPhase(f.league.round),
+      group: afGroupFromRound(f.league.round),
+      matchday,
     }
   }
 
   async getMatches(): Promise<MatchData[]> {
-    const fixtures = await this.fetch<ApiFixtureResponse[]>(`/fixtures?league=${this.leagueId}&season=${this.season}`)
+    const fixtures = await this.getRawFixtures()
     return fixtures.map(f => this.mapFixture(f))
   }
 
   async getLiveScores(): Promise<MatchData[]> {
-    const fixtures = await this.fetch<ApiFixtureResponse[]>(`/fixtures?live=all&league=${this.leagueId}`)
+    const fixtures = await this.getRawLiveFixtures()
     return fixtures.map(f => this.mapFixture(f))
   }
 
@@ -357,6 +425,10 @@ class ApiFootballProvider implements FootballDataProvider {
 // --- Factory ---
 
 export function createFootballProvider(): FootballDataProvider {
+  // API_FOOTBALL_KEY takes priority (user-supplied variable name)
+  if (process.env.API_FOOTBALL_KEY) {
+    return new ApiFootballProvider()
+  }
   const provider = process.env.FOOTBALL_API_PROVIDER ?? 'mock'
   if (provider === 'worldcup26' && process.env.WORLDCUP26_TOKEN) {
     return new WorldCup26Provider()
