@@ -51,7 +51,7 @@ export default async function PronosticosPage() {
   // Group matches by date label
   type Match = typeof matches[0]
   const grouped = matches.reduce<Record<string, Match[]>>((acc, m) => {
-    const key = format(new Date(m.kickoffAt), 'yyyy-MM-dd')
+    const key = m.kickoffAt.toISOString().split('T')[0]
     if (!acc[key]) acc[key] = []
     acc[key].push(m)
     return acc
@@ -116,7 +116,8 @@ export default async function PronosticosPage() {
       {/* Matches grouped by day */}
       <div className="space-y-6">
         {Object.entries(grouped).map(([dateKey, dayMatches]) => {
-          const label = format(new Date(dateKey), "EEEE d 'de' MMMM", { locale: es })
+          const [dy, dm, dd] = dateKey.split('-').map(Number)
+          const label = format(new Date(dy, dm - 1, dd), "EEEE d 'de' MMMM", { locale: es })
           return (
             <div key={dateKey}>
               {/* Day header */}

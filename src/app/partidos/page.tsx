@@ -27,7 +27,8 @@ function TeamFlag({ flag, name }: { flag: string | null; name: string }) {
 
 function groupByDate(matches: Parameters<typeof MatchCard>[0]['match'][]) {
   return matches.reduce((acc, match) => {
-    const key = format(new Date(match.kickoffAt), 'yyyy-MM-dd')
+    // Use UTC date string as key to avoid timezone shifts on the server
+    const key = match.kickoffAt.toISOString().split('T')[0]
     if (!acc[key]) acc[key] = []
     acc[key].push(match)
     return acc
@@ -205,7 +206,9 @@ export default async function PartidosPage({
       {/* Matches grouped by date */}
       <div className="space-y-6">
         {Object.entries(grouped).map(([dateKey, dateMatches]) => {
-          const dateLabel = format(new Date(dateKey), "d 'de' MMMM, yyyy", { locale: es }).toUpperCase()
+          // Parse dateKey ('yyyy-MM-dd') as LOCAL date to avoid UTC→local shift
+          const [dy, dm, dd] = dateKey.split('-').map(Number)
+          const dateLabel = format(new Date(dy, dm - 1, dd), "d 'de' MMMM, yyyy", { locale: es }).toUpperCase()
           // Determine phase label for the section
           const firstMatch = dateMatches[0]
           const sectionPhase = firstMatch.group
