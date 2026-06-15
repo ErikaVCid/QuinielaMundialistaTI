@@ -152,32 +152,55 @@ model TournamentGroup {
 }
 
 model Match {
-  id         String      @id @default(cuid())
-  externalId String?     @unique
-  homeTeamId String
-  awayTeamId String
-  homeScore  Int?
-  awayScore  Int?
-  kickoffAt  DateTime
-  stadium    String?
-  city       String?
-  country    String?
-  phase      Phase       @default(GROUP)
-  groupId    String?
-  status     MatchStatus @default(SCHEDULED)
-  matchday   Int?
-  round      String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  externalId   String?     @unique
+  homeTeamId   String
+  awayTeamId   String
+  winnerTeamId String?
+  homeScore    Int?
+  awayScore    Int?
+  kickoffAt    DateTime
+  stadium      String?
+  city         String?
+  country      String?
+  phase        Phase       @default(GROUP)
+  groupId      String?
+  status       MatchStatus @default(SCHEDULED)
+  matchday     Int?
+  round        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  homeTeam    Team             @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam    Team             @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  group       TournamentGroup? @relation(fields: [groupId], references: [id])
-  predictions Prediction[]
-  news        News[]
-  rankings    Ranking[]
+  homeTeam     Team             @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team             @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  group        TournamentGroup? @relation(fields: [groupId], references: [id])
+  predictions  Prediction[]
+  aiPrediction AiPrediction?
+  news         News[]
+  rankings     Ranking[]
 
   @@map("matches")
+}
+
+model AiPrediction {
+  id                 String   @id @default(cuid())
+  matchId            String   @unique
+  predictedHomeGoals Int
+  predictedAwayGoals Int
+  predictedResult    String   // HOME_WIN | DRAW | AWAY_WIN
+  homeWinProbability Float
+  drawProbability    Float
+  awayWinProbability Float
+  confidence         Float
+  modelVersion       String   @default("v1")
+  explanation        String?  @db.Text
+  isManual           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id])
+
+  @@map("ai_predictions")
 }
 
 model Prediction {

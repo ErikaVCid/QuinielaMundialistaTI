@@ -1,9 +1,7 @@
 /**
- * Sync all World Cup 2026 fixtures from api-football v3.
+ * Sincroniza equipos y partidos del Mundial 2026 desde API-Football v3.
+ * Usa 1 sola request — no gasta cuota innecesariamente.
  *   npm run sync:af
- *
- * Requires API_FOOTBALL_KEY in .env.local
- * Free tier: 100 req/day — this script uses 1 request.
  */
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
@@ -11,22 +9,29 @@ dotenv.config({ path: '.env.local' })
 import { PrismaClient, Phase } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) })
-const API_KEY = process.env.API_FOOTBALL_KEY ?? process.env.FOOTBALL_API_KEY ?? ''
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+})
+
+const API_KEY = process.env.API_FOOTBALL_KEY ?? ''
+const BASE_URL = process.env.API_FOOTBALL_BASE_URL ?? 'https://v3.football.api-sports.io'
 
 if (!API_KEY) {
   console.error('❌  Falta API_FOOTBALL_KEY en .env.local')
   process.exit(1)
 }
 
-interface ApiFixture {
+// ── Tipos ──────────────────────────────────────────────────────────────────────
+
+interface AfFixture {
   fixture: {
     id: number
     date: string
-    venue: { name: string | null; city: string | null }
-    status: { short: string }
+    timezone: string
+    venue: { id: number | null; name: string | null; city: string | null }
+    status: { long: string; short: string; elapsed: number | null }
   }
-  league: { round: string }
+  league: { id: number; name: string; season: number; round: string }
   teams: {
     home: { id: number; name: string; logo: string; winner: boolean | null }
     away: { id: number; name: string; logo: string; winner: boolean | null }
@@ -39,38 +44,16 @@ interface ApiFixture {
   }
 }
 
-const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'INT'])
-const DONE = new Set(['FT', 'AET', 'PEN'])
-const POST = new Set(['PST', 'CANC', 'ABD', 'AWD', 'WO'])
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-const NAME_TO_CODE: Record<string, string> = {
-  'Mexico': 'MEX', 'South Africa': 'RSA', 'South Korea': 'KOR', 'Czech Republic': 'CZE',
-  'Canada': 'CAN', 'Bosnia and Herzegovina': 'BIH', 'Qatar': 'QAT', 'Switzerland': 'SUI',
-  'Haiti': 'HAI', 'Scotland': 'SCO', 'Australia': 'AUS', 'Turkey': 'TUR',
-  'United States': 'USA', 'Panama': 'PAN', 'Iraq': 'IRQ', 'Norway': 'NOR',
-  'Brazil': 'BRA', 'Curaçao': 'CUW', 'Ivory Coast': 'CIV', 'Ecuador': 'ECU',
-  'Germany': 'GER', 'Netherlands': 'NED', 'Japan': 'JPN', 'Sweden': 'SWE',
-  'Tunisia': 'TUN', 'France': 'FRA', 'Senegal': 'SEN', 'Argentina': 'ARG',
-  'Algeria': 'ALG', 'Austria': 'AUT', 'Jordan': 'JOR', 'England': 'ENG',
-  'Croatia': 'CRO', 'Portugal': 'POR', 'DR Congo': 'COD', 'Uruguay': 'URU',
-  'Tahiti': 'TAH', 'Saudi Arabia': 'KSA', 'Morocco': 'MAR', 'Iran': 'IRN',
-  'New Zealand': 'NZL', 'Chile': 'CHI', 'Peru': 'PER', 'Colombia': 'COL',
-  'Belgium': 'BEL', 'Egypt': 'EGY', 'Serbia': 'SRB', 'Indonesia': 'IDN',
-  'Spain': 'ESP', 'Greece': 'GRE', 'Romania': 'ROU', 'Ghana': 'GHA',
-  'Uzbekistan': 'UZB', 'Hungary': 'HUN', 'Costa Rica': 'CRC', 'Cameroon': 'CMR',
-  'Nigeria': 'NGA', 'Italy': 'ITA', 'Paraguay': 'PAR', 'Kenya': 'KEN',
-  'Honduras': 'HON', 'Venezuela': 'VEN', 'Angola': 'ANG', 'Gambia': 'GAM',
-  'Trinidad and Tobago': 'TRI', 'Azerbaijan': 'AZE', 'Bolivia': 'BOL',
-}
+const LIVE_ST = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'INT'])
+const DONE_ST = new Set(['FT', 'AET', 'PEN'])
+const POST_ST = new Set(['PST', 'CANC', 'ABD', 'AWD', 'WO'])
 
-function teamCode(name: string, id: number): string {
-  return NAME_TO_CODE[name] ?? `AF${id}`
-}
-
-function mapStatus(short: string): 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' {
-  if (LIVE.has(short)) return 'LIVE'
-  if (DONE.has(short)) return 'FINISHED'
-  if (POST.has(short)) return 'POSTPONED'
+function mapStatus(s: string): 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' {
+  if (LIVE_ST.has(s)) return 'LIVE'
+  if (DONE_ST.has(s)) return 'FINISHED'
+  if (POST_ST.has(s)) return 'POSTPONED'
   return 'SCHEDULED'
 }
 
@@ -85,110 +68,172 @@ function mapPhase(round: string): Phase {
   return Phase.GROUP
 }
 
+function matchday(round: string): number | undefined {
+  const m = round.match(/(\d+)$/)
+  return m ? parseInt(m[1]) : undefined
+}
+
+function score(f: AfFixture) {
+  return {
+    home: f.score.fulltime.home ?? f.goals.home ?? undefined,
+    away: f.score.fulltime.away ?? f.goals.away ?? undefined,
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+
 async function main() {
-  console.log('Fetching fixtures from api-football v3...')
-  const res = await fetch('https://v3.football.api-sports.io/fixtures?league=1&season=2026', {
+  console.log('🔄  Fetching fixtures from API-Football (league=1, season=2026)...')
+
+  const res = await fetch(`${BASE_URL}/fixtures?league=1&season=2026`, {
     headers: { 'x-apisports-key': API_KEY },
   })
 
   if (!res.ok) {
-    console.error(`❌  HTTP ${res.status}:`, await res.text())
+    console.error(`❌  HTTP ${res.status}: ${await res.text()}`)
     process.exit(1)
   }
 
   const json = await res.json() as {
-    response: ApiFixture[]
-    errors: unknown
+    response: AfFixture[]
+    errors: Record<string, string>
     results: number
     paging: { current: number; total: number }
   }
 
-  if (json.errors && typeof json.errors === 'object' && Object.keys(json.errors as object).length > 0) {
-    console.error('❌  API errors:', json.errors)
+  if (Object.keys(json.errors ?? {}).length > 0) {
+    console.error('❌  API errors:', JSON.stringify(json.errors))
     process.exit(1)
   }
 
-  const fixtures: ApiFixture[] = json.response ?? []
-  console.log(`  ${fixtures.length} fixtures recibidos (paging: ${json.paging?.current}/${json.paging?.total})`)
+  const fixtures = json.response ?? []
+  console.log(`   ${fixtures.length} fixtures · pág ${json.paging?.current}/${json.paging?.total}`)
 
   if (fixtures.length === 0) {
-    console.log('  Sin datos — verifica que la key sea válida y el torneo esté en la base de datos.')
+    console.log('   Sin datos. Verifica que la key sea válida y el torneo esté disponible.')
     return
   }
 
-  // Extract unique teams
-  const teamsMap = new Map<number, { id: number; name: string; logo: string }>()
+  // ── Equipos ──────────────────────────────────────────────────────────────────
+
+  console.log('\n📦  Sincronizando equipos...')
+  const teamsMap = new Map<number, { name: string; logo: string }>()
   for (const f of fixtures) {
-    teamsMap.set(f.teams.home.id, f.teams.home)
-    teamsMap.set(f.teams.away.id, f.teams.away)
+    teamsMap.set(f.teams.home.id, { name: f.teams.home.name, logo: f.teams.home.logo })
+    teamsMap.set(f.teams.away.id, { name: f.teams.away.name, logo: f.teams.away.logo })
   }
 
-  // Upsert teams (code = FIFA code or AF{id})
-  const teamDbIdByApiId = new Map<number, string>()
-  let teamsUpserted = 0
+  const teamDbId = new Map<number, string>()   // apiId → DB cuid
 
-  for (const t of teamsMap.values()) {
-    const code = teamCode(t.name, t.id)
-    const team = await prisma.team.upsert({
-      where: { code },
-      update: { name: t.name, flag: t.logo, externalId: String(t.id) },
-      create: { name: t.name, code, flag: t.logo, externalId: String(t.id) },
-    })
-    teamDbIdByApiId.set(t.id, team.id)
-    teamsUpserted++
+  for (const [apiId, t] of teamsMap) {
+    // Derive a readable 3-letter code; fall back to AF{id} if collision
+    const readableCode = t.name.replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase()
+    const fallbackCode = `A${String(apiId).slice(-2).padStart(2, '0')}`
+
+    let team
+    // Try to find existing team by externalId first
+    const existing = await prisma.team.findFirst({ where: { externalId: `af-team-${apiId}` } })
+    if (existing) {
+      team = await prisma.team.update({
+        where: { id: existing.id },
+        data: { name: t.name, flag: t.logo },
+      })
+    } else {
+      // Try readable code, fall back to numeric if taken
+      const code = (await prisma.team.findUnique({ where: { code: readableCode } })) === null
+        ? readableCode
+        : fallbackCode
+      team = await prisma.team.create({
+        data: { name: t.name, code, flag: t.logo, externalId: `af-team-${apiId}` },
+      })
+    }
+
+    teamDbId.set(apiId, team.id)
   }
-  console.log(`  ✓ ${teamsUpserted} equipos`)
+  console.log(`   ✓ ${teamsMap.size} equipos upserted`)
 
-  // Upsert matches
-  let matchesUpserted = 0, errors = 0
+  // ── Partidos ─────────────────────────────────────────────────────────────────
+
+  console.log('\n📅  Sincronizando partidos...')
+  let upserted = 0, updated = 0, errors = 0
 
   for (const f of fixtures) {
     try {
-      const homeTeamId = teamDbIdByApiId.get(f.teams.home.id)
-      const awayTeamId = teamDbIdByApiId.get(f.teams.away.id)
-      if (!homeTeamId || !awayTeamId) continue
+      const homeTeamId = teamDbId.get(f.teams.home.id)
+      const awayTeamId = teamDbId.get(f.teams.away.id)
+      if (!homeTeamId || !awayTeamId) { errors++; continue }
 
-      const short = f.fixture.status.short
-      const status = mapStatus(short)
-      const homeScore = f.score.fulltime.home ?? f.goals.home ?? undefined
-      const awayScore = f.score.fulltime.away ?? f.goals.away ?? undefined
-      const matchdayMatch = f.league.round.match(/(\d+)$/)
-      const matchday = matchdayMatch ? parseInt(matchdayMatch[1]) : undefined
+      const externalId = `af-${f.fixture.id}`
+      const status = mapStatus(f.fixture.status.short)
+      const sc = score(f)
+      const phase = mapPhase(f.league.round)
+      const md = matchday(f.league.round)
 
-      await prisma.match.upsert({
-        where: { externalId: `af-${f.fixture.id}` },
-        update: {
-          status,
-          homeScore: homeScore ?? undefined,
-          awayScore: awayScore ?? undefined,
-          stadium: f.fixture.venue.name ?? undefined,
-          city: f.fixture.venue.city ?? undefined,
-          phase: mapPhase(f.league.round),
-        },
-        create: {
-          externalId: `af-${f.fixture.id}`,
-          homeTeamId,
-          awayTeamId,
-          kickoffAt: new Date(f.fixture.date),
-          stadium: f.fixture.venue.name ?? undefined,
-          city: f.fixture.venue.city ?? undefined,
-          phase: mapPhase(f.league.round),
-          status,
-          homeScore: homeScore ?? undefined,
-          awayScore: awayScore ?? undefined,
-          matchday,
-        },
-      })
-      matchesUpserted++
+      // Determine winner
+      let winnerTeamId: string | undefined
+      if (status === 'FINISHED') {
+        if (f.teams.home.winner === true) winnerTeamId = homeTeamId
+        else if (f.teams.away.winner === true) winnerTeamId = awayTeamId
+      }
+
+      const existing = await prisma.match.findUnique({ where: { externalId } })
+
+      if (existing) {
+        await prisma.match.update({
+          where: { externalId },
+          data: {
+            status,
+            homeScore: sc.home ?? existing.homeScore,
+            awayScore: sc.away ?? existing.awayScore,
+            winnerTeamId: winnerTeamId ?? existing.winnerTeamId,
+            stadium: f.fixture.venue.name ?? existing.stadium,
+            city: f.fixture.venue.city ?? existing.city,
+            phase,
+            round: f.league.round,
+          },
+        })
+        updated++
+      } else {
+        await prisma.match.create({
+          data: {
+            externalId,
+            homeTeamId,
+            awayTeamId,
+            kickoffAt: new Date(f.fixture.date),
+            stadium: f.fixture.venue.name ?? undefined,
+            city: f.fixture.venue.city ?? undefined,
+            phase,
+            status,
+            homeScore: sc.home ?? undefined,
+            awayScore: sc.away ?? undefined,
+            winnerTeamId,
+            matchday: md,
+            round: f.league.round,
+          },
+        })
+        upserted++
+      }
     } catch (e) {
-      console.error(`  ⚠️  fixture ${f.fixture.id}:`, (e as Error).message)
+      console.error(`   ⚠️  fixture ${f.fixture.id}:`, (e as Error).message)
       errors++
     }
   }
 
-  console.log(`  ✓ ${matchesUpserted} partidos upserted`)
-  if (errors > 0) console.log(`  ⚠️  ${errors} errores`)
-  console.log('\n🎉 Sync completo.')
+  console.log(`   ✓ ${upserted} nuevos · ${updated} actualizados · ${errors} errores`)
+
+  // ── Resumen ──────────────────────────────────────────────────────────────────
+
+  const finished = fixtures.filter(f => DONE_ST.has(f.fixture.status.short)).length
+  const live = fixtures.filter(f => LIVE_ST.has(f.fixture.status.short)).length
+  const scheduled = fixtures.length - finished - live
+
+  console.log(`\n📊  Resumen:`)
+  console.log(`   Finalizados: ${finished}`)
+  console.log(`   En vivo:     ${live}`)
+  console.log(`   Programados: ${scheduled}`)
+  console.log('\n✅  Sync completo. Recarga http://localhost:3000/partidos')
 }
 
-main().catch(e => { console.error(e); process.exit(1) }).finally(() => prisma.$disconnect())
+main()
+  .catch(e => { console.error('Error:', e); process.exit(1) })
+  .finally(() => prisma.$disconnect())

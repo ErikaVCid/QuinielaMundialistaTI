@@ -13,7 +13,8 @@
     "sync:wc26": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-wc26.ts",
     "sync:af": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-apifootball.ts",
     "sync:sm": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-sportmonks.ts",
-    "sync:sm:discover": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-sportmonks.ts discover"
+    "sync:sm:discover": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-sportmonks.ts discover",
+    "predictions:generate": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/generate-predictions.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
