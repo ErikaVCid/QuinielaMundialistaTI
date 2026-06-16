@@ -3,12 +3,13 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
 import { formatMatchTime, isMatchLocked } from '@/lib/utils'
-import { Lock, Clock, CheckCircle, Target } from 'lucide-react'
+import { Lock, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { FillWeekButton } from '@/components/fill-week-button'
 import { TeamFlag } from '@/components/team-flag'
+import { InlinePrediction } from '@/components/inline-prediction'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -158,25 +159,44 @@ export default async function PronosticosPage() {
                           <TeamFlag team={match.homeTeam} size="sm" />
                         </div>
 
-                        {/* Center: score or VS */}
-                        <div className="text-center px-2 min-w-[4rem]">
-                          {prediction ? (
+                        {/* Center: inline prediction or result */}
+                        <div className="flex justify-center px-1">
+                          {isFinished ? (
                             <div className="flex flex-col items-center">
-                              <span className="text-sm font-bold text-white tabular-nums font-mono leading-tight">
-                                {prediction.homeScore}–{prediction.awayScore}
-                              </span>
-                              {isFinished && match.homeScore !== null && (
-                                <span className="text-xs text-gray-600 leading-tight">
-                                  ({match.homeScore}–{match.awayScore})
+                              {prediction && (
+                                <span className="text-sm font-bold text-white tabular-nums font-mono leading-tight">
+                                  {prediction.homeScore}–{prediction.awayScore}
                                 </span>
                               )}
+                              {match.homeScore !== null && (
+                                <span className={cn(
+                                  'text-xs tabular-nums',
+                                  prediction ? 'text-gray-600' : 'text-gray-400 font-bold'
+                                )}>
+                                  {prediction ? `(${match.homeScore}–${match.awayScore})` : `${match.homeScore}–${match.awayScore}`}
+                                </span>
+                              )}
+                              {!prediction && !match.homeScore && (
+                                <span className="text-xs text-gray-600">Fin</span>
+                              )}
                             </div>
-                          ) : isFinished && match.homeScore !== null ? (
-                            <span className="text-sm font-bold text-gray-400 tabular-nums">
-                              {match.homeScore}–{match.awayScore}
-                            </span>
+                          ) : locked ? (
+                            // Match started, prediction locked
+                            prediction ? (
+                              <span className="text-sm font-bold text-white tabular-nums font-mono">
+                                {prediction.homeScore}–{prediction.awayScore}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-600">—</span>
+                            )
                           ) : (
-                            <span className="text-xs font-bold text-gray-600">VS</span>
+                            // Open for prediction — show inline inputs
+                            <InlinePrediction
+                              matchId={match.id}
+                              participantId={participant.id}
+                              existingHome={prediction?.homeScore}
+                              existingAway={prediction?.awayScore}
+                            />
                           )}
                         </div>
 
@@ -189,30 +209,20 @@ export default async function PronosticosPage() {
                         </div>
 
                         {/* Status badge */}
-                        <div className="flex items-center justify-end">
-                          {prediction ? (
-                            isFinished ? (
-                              <span className={cn(
-                                'text-xs font-bold px-2 py-0.5 rounded-lg tabular-nums',
-                                prediction.points === 5 ? 'bg-amber-500/20 text-amber-400' :
-                                prediction.points === 3 ? 'bg-green-500/20 text-green-400' :
-                                prediction.points === 1 ? 'bg-blue-500/20 text-blue-400' :
-                                'bg-gray-500/10 text-gray-500'
-                              )}>
-                                {prediction.points ?? 0} pts
-                              </span>
-                            ) : locked ? (
-                              <Lock className="w-3.5 h-3.5 text-gray-600" />
-                            ) : (
-                              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                            )
-                          ) : locked ? (
-                            <span className="text-xs text-gray-600">Sin pronóstico</span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-xs text-yellow-500 font-medium">
-                              <Target className="w-3 h-3" />Pendiente
+                        <div className="flex items-center justify-end w-16">
+                          {isFinished && prediction ? (
+                            <span className={cn(
+                              'text-xs font-bold px-2 py-0.5 rounded-lg tabular-nums',
+                              prediction.points === 5 ? 'bg-amber-500/20 text-amber-400' :
+                              prediction.points === 3 ? 'bg-green-500/20 text-green-400' :
+                              prediction.points === 1 ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-gray-500/10 text-gray-500'
+                            )}>
+                              {prediction.points ?? 0} pts
                             </span>
-                          )}
+                          ) : locked && !isFinished ? (
+                            <Lock className="w-3.5 h-3.5 text-gray-600" />
+                          ) : null}
                         </div>
                       </div>
                     </Link>
