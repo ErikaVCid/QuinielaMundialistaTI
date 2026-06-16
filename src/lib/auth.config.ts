@@ -11,7 +11,8 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user
       const isAuthPage = nextUrl.pathname.startsWith('/login') || nextUrl.pathname.startsWith('/registro')
       const isApiAuth = nextUrl.pathname.startsWith('/api/auth')
-      const isPublic = isAuthPage || isApiAuth
+      const isApiRoute = nextUrl.pathname.startsWith('/api/')
+      const isPublic = isAuthPage || isApiAuth || isApiRoute
 
       if (!isLoggedIn && !isPublic) {
         const loginUrl = new URL('/login', nextUrl.origin)
