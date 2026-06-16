@@ -8,6 +8,11 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { TeamFlag } from '@/components/team-flag'
 
+function youtubeSearchUrl(homeTeam: string, awayTeam: string) {
+  const q = encodeURIComponent(`${homeTeam} vs ${awayTeam} FIFA World Cup 2026 en vivo`)
+  return `https://www.youtube.com/results?search_query=${q}`
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default async function HomePage() {
@@ -87,30 +92,27 @@ export default async function HomePage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {liveMatches.map((match) => (
-              <Link key={match.id} href={`/partidos/${match.id}`} className="block group">
-                <div className="bg-[#111118] rounded-xl border border-red-500/25 p-5 group-hover:border-red-500/50 transition-all">
+              <div key={match.id} className="bg-[#111118] rounded-xl border border-red-500/25 overflow-hidden">
+                {/* Match info */}
+                <Link href={`/partidos/${match.id}`} className="block p-5 hover:bg-red-950/20 transition-all">
                   <div className="flex items-center justify-between text-xs mb-4">
                     <span className="text-gray-500">
                       {match.group ? `Grupo ${match.group.label}` : phaseLabel(match.phase)}
                     </span>
-                    <span className="flex items-center gap-1 text-red-400 font-bold">
+                    <span className="flex items-center gap-1 text-red-400 font-bold animate-pulse">
                       <Zap className="w-3 h-3" /> EN VIVO
                     </span>
                   </div>
-                  {/* Teams */}
                   <div className="flex items-center gap-3">
-                    {/* Home */}
                     <div className="flex-1 flex items-center justify-end gap-2">
                       <span className="text-sm font-bold text-white truncate">{match.homeTeam.name}</span>
                       <TeamFlag team={match.homeTeam} size="md" />
                     </div>
-                    {/* Score */}
                     <div className="text-center px-3">
                       <div className="text-2xl font-bold text-white tabular-nums font-mono">
                         {match.homeScore ?? 0}–{match.awayScore ?? 0}
                       </div>
                     </div>
-                    {/* Away */}
                     <div className="flex-1 flex items-center justify-start gap-2">
                       <TeamFlag team={match.awayTeam} size="md" />
                       <span className="text-sm font-bold text-white truncate">{match.awayTeam.name}</span>
@@ -119,8 +121,45 @@ export default async function HomePage() {
                   {match.stadium && (
                     <p className="text-xs text-gray-600 text-center mt-3">{match.stadium}, {match.city}</p>
                   )}
+                </Link>
+
+                {/* Watch live buttons */}
+                <div className="border-t border-red-500/20 px-5 py-3 flex flex-wrap gap-2 bg-red-950/10">
+                  <a
+                    href={youtubeSearchUrl(match.homeTeam.name, match.awayTeam.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold transition-all shadow-lg shadow-red-600/30"
+                  >
+                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    Ver ahora
+                  </a>
+                  <a
+                    href="https://www.youtube.com/@tudnusa/streams"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] text-gray-300 hover:text-white text-xs font-medium transition-all"
+                  >
+                    TUDN
+                  </a>
+                  <a
+                    href="https://www.youtube.com/@TelemundoDeportes/streams"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] text-gray-300 hover:text-white text-xs font-medium transition-all"
+                  >
+                    Telemundo
+                  </a>
+                  <a
+                    href="https://www.youtube.com/@fifatv/streams"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] text-gray-300 hover:text-white text-xs font-medium transition-all"
+                  >
+                    FIFA TV
+                  </a>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </section>

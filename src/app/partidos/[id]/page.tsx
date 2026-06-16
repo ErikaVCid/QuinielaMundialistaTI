@@ -5,6 +5,19 @@ import { formatMatchDate, formatMatchTime, phaseLabel, isMatchLocked } from '@/l
 import { PredictionForm } from '@/components/prediction-form'
 import { MapPin, Clock, Trophy, Users, Play, Users2 } from 'lucide-react'
 
+function youtubeSearchUrl(homeTeam: string, awayTeam: string) {
+  const q = encodeURIComponent(`${homeTeam} vs ${awayTeam} FIFA World Cup 2026 en vivo`)
+  return `https://www.youtube.com/results?search_query=${q}`
+}
+
+function YoutubeIcon() {
+  return (
+    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+    </svg>
+  )
+}
+
 // Shows badge (HD crest) when available, falls back to flag (national flag)
 function TeamImage({ team, size = 'lg' }: {
   team: { name: string; flag: string | null; badge: string | null }
@@ -141,6 +154,43 @@ export default async function MatchDetailPage({
           </div>
         </div>
       </div>
+
+      {/* ── Ver en vivo (LIVE matches) ────────────────────────────────── */}
+      {isLive && (
+        <div className="bg-red-950/30 border border-red-500/30 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-red-400 font-bold text-sm">PARTIDO EN VIVO — Ver ahora</span>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {/* Main CTA */}
+            <a
+              href={youtubeSearchUrl(match.homeTeam.name, match.awayTeam.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition-all shadow-lg shadow-red-600/30"
+            >
+              <YoutubeIcon />
+              Ver ahora en YouTube
+            </a>
+            {/* Broadcast channels */}
+            {[
+              { name: 'TUDN',       url: 'https://www.youtube.com/@tudnusa/streams' },
+              { name: 'Telemundo',  url: 'https://www.youtube.com/@TelemundoDeportes/streams' },
+              { name: 'FIFA TV',    url: 'https://www.youtube.com/@fifatv/streams' },
+              { name: 'Fox Sports', url: 'https://www.youtube.com/results?search_query=Fox+Sports+FIFA+World+Cup+2026+live' },
+            ].map(ch => (
+              <a key={ch.name} href={ch.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] hover:border-red-500/30 text-gray-300 hover:text-white text-sm font-medium transition-all">
+                {ch.name}
+              </a>
+            ))}
+          </div>
+          <p className="text-xs text-gray-600 mt-3">
+            Los links abren la búsqueda en YouTube — selecciona el canal oficial disponible en tu región.
+          </p>
+        </div>
+      )}
 
       {/* ── Highlights ────────────────────────────────────────────────── */}
       {match.highlightUrl && (
