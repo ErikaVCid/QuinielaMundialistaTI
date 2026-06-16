@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Home, Calendar, Target, Trophy, Newspaper,
-  User, Settings, LogOut, Menu, X
+  LayoutGrid, User, Settings, LogOut, Menu, X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -13,6 +13,7 @@ import { signOut } from 'next-auth/react'
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/partidos', label: 'Partidos', icon: Calendar },
+  { href: '/grupos', label: 'Grupos', icon: LayoutGrid },
   { href: '/pronosticos', label: 'Pronósticos', icon: Target },
   { href: '/posiciones', label: 'Posiciones', icon: Trophy },
   { href: '/noticias', label: 'Noticias', icon: Newspaper },
