@@ -7,6 +7,7 @@ import { Trophy, Target, Calendar, TrendingUp, ChevronRight } from 'lucide-react
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { TeamFlag } from '@/components/team-flag'
+import { LiveLineup } from '@/components/live-lineup'
 
 function youtubeSearchUrl(homeTeam: string, awayTeam: string) {
   const q = encodeURIComponent(`${homeTeam} vs ${awayTeam} FIFA World Cup 2026 en vivo`)
@@ -167,67 +168,72 @@ export default async function HomePage() {
                 {/* ── RIGHT: Match Center panel (2/5) ── */}
                 <div className="lg:col-span-2 flex flex-col gap-3">
 
-                  {/* AI Prediction */}
-                  {match.aiPrediction && (
-                    <div className="bg-[#0d0d14] rounded-2xl border border-[#1e1e2e] p-4 flex-shrink-0">
-                      <div className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-3">
-                        ✦ Predicción IA
+                  {/* ── LINEUP / FORMATION PITCH ── */}
+                  <div className="bg-[#0d0d14] rounded-2xl border border-[#1e1e2e] overflow-hidden">
+                    {/* Header with team names */}
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e1e2e]">
+                      <div className="flex items-center gap-1.5">
+                        <TeamFlag team={match.homeTeam} size="xs" />
+                        <span className="text-xs font-bold text-white">{match.homeTeam.name}</span>
                       </div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="text-xs text-gray-400 flex-1 text-right">{match.homeTeam.name}</span>
-                        <span className="text-xl font-black text-white tabular-nums font-mono bg-[#1a1a28] px-3 py-1 rounded-lg">
+                      <span className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Alineación</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white">{match.awayTeam.name}</span>
+                        <TeamFlag team={match.awayTeam} size="xs" />
+                      </div>
+                    </div>
+
+                    {/* Pitch — uses api-football if key set, else stylized placeholder */}
+                    <LiveLineup
+                      fixtureId={match.externalId?.replace('af-', '') ?? ''}
+                      homeName={match.homeTeam.name}
+                      awayName={match.awayTeam.name}
+                      homeColor="bg-blue-600 border-blue-300"
+                      awayColor="bg-red-700 border-red-400"
+                    />
+                  </div>
+
+                  {/* AI Prediction compact */}
+                  {match.aiPrediction && (
+                    <div className="bg-[#0d0d14] rounded-xl border border-[#1e1e2e] px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-600 font-semibold uppercase tracking-widest">Predicción IA</span>
+                        <span className="text-sm font-black text-white tabular-nums font-mono">
                           {match.aiPrediction.predictedHomeGoals}–{match.aiPrediction.predictedAwayGoals}
                         </span>
-                        <span className="text-xs text-gray-400 flex-1">{match.awayTeam.name}</span>
                       </div>
-                      {/* Probability bars */}
-                      <div className="space-y-1.5">
-                        {[
-                          { label: match.homeTeam.name, pct: match.aiPrediction.homeWinProbability, color: 'bg-green-500' },
-                          { label: 'Empate', pct: match.aiPrediction.drawProbability, color: 'bg-gray-500' },
-                          { label: match.awayTeam.name, pct: match.aiPrediction.awayWinProbability, color: 'bg-blue-500' },
-                        ].map(({ label, pct, color }) => (
-                          <div key={label} className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600 w-16 truncate text-right">{label}</span>
-                            <div className="flex-1 h-1.5 bg-[#1a1a28] rounded-full overflow-hidden">
-                              <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs font-bold text-gray-400 w-8">{pct}%</span>
-                          </div>
-                        ))}
+                      <div className="flex gap-1 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-blue-500 rounded-l-full" style={{ width: `${match.aiPrediction.homeWinProbability}%` }} />
+                        <div className="bg-gray-600" style={{ width: `${match.aiPrediction.drawProbability}%` }} />
+                        <div className="bg-red-500 rounded-r-full" style={{ width: `${match.aiPrediction.awayWinProbability}%` }} />
+                      </div>
+                      <div className="flex justify-between mt-1 text-[9px] text-gray-600">
+                        <span>{match.homeTeam.name} {match.aiPrediction.homeWinProbability}%</span>
+                        <span>Empate {match.aiPrediction.drawProbability}%</span>
+                        <span>{match.aiPrediction.awayWinProbability}% {match.awayTeam.name}</span>
                       </div>
                     </div>
                   )}
 
-                  {/* My prediction */}
-                  {match.predictions.length > 0 && (
-                    <div className="bg-green-500/10 rounded-2xl border border-green-500/20 px-4 py-3">
-                      <div className="text-xs text-green-500 font-semibold uppercase tracking-widest mb-1.5">
-                        Tu pronóstico
+                  {/* My prediction + channels */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {match.predictions.length > 0 && (
+                      <div className="bg-green-500/10 rounded-xl border border-green-500/20 px-3 py-2.5 text-center">
+                        <div className="text-[10px] text-green-500 font-bold uppercase mb-1">Tu pronóstico</div>
+                        <div className="text-lg font-black text-white font-mono">{match.predictions[0].homeScore}–{match.predictions[0].awayScore}</div>
                       </div>
-                      <div className="text-2xl font-black text-white tabular-nums font-mono text-center">
-                        {match.predictions[0].homeScore}–{match.predictions[0].awayScore}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Broadcast channels */}
-                  <div className="bg-[#0d0d14] rounded-2xl border border-[#1e1e2e] p-4">
-                    <div className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-3">
-                      📺 Canales de transmisión
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    )}
+                    <div className={`${match.predictions.length > 0 ? '' : 'col-span-2'} grid grid-cols-2 gap-1`}>
                       {[
-                        { name: 'TUDN',       url: 'https://www.youtube.com/@tudnusa/streams',               flag: '🇲🇽' },
-                        { name: 'Telemundo',  url: 'https://www.youtube.com/@TelemundoDeportes/streams',    flag: '🇲🇽' },
-                        { name: 'FIFA TV',    url: 'https://www.youtube.com/@fifatv/streams',                flag: '🌍' },
-                        { name: 'Fox Sports', url: 'https://www.youtube.com/results?search_query=Fox+Sports+World+Cup+2026+live', flag: '🇺🇸' },
+                        { name: 'TUDN', url: 'https://www.youtube.com/@tudnusa/streams', flag: '🇲🇽' },
+                        { name: 'Telemundo', url: 'https://www.youtube.com/@TelemundoDeportes/streams', flag: '🇲🇽' },
+                        { name: 'FIFA TV', url: 'https://www.youtube.com/@fifatv/streams', flag: '🌍' },
+                        { name: 'Fox', url: 'https://www.youtube.com/results?search_query=Fox+Sports+World+Cup+2026+live', flag: '🇺🇸' },
                       ].map(ch => (
                         <a key={ch.name} href={ch.url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#131320] hover:bg-[#1e1e2e] border border-[#2e2e3e] hover:border-red-500/30 transition-all group">
-                          <span className="text-base">{ch.flag}</span>
-                          <span className="text-xs font-semibold text-gray-400 group-hover:text-white transition-colors">{ch.name}</span>
-                          <svg className="w-3 h-3 ml-auto text-gray-700 group-hover:text-red-400 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                          className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[#131320] hover:bg-[#1e1e2e] border border-[#2e2e3e] hover:border-red-500/30 transition-all">
+                          <span className="text-sm">{ch.flag}</span>
+                          <span className="text-xs text-gray-500 hover:text-white transition-colors truncate">{ch.name}</span>
                         </a>
                       ))}
                     </div>
