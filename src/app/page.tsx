@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
 import { formatMatchTime, phaseLabel } from '@/lib/utils'
-import { Trophy, Target, Calendar, TrendingUp, ChevronRight, Zap } from 'lucide-react'
+import { Trophy, Target, Calendar, TrendingUp, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { TeamFlag } from '@/components/team-flag'
@@ -25,7 +25,15 @@ export default async function HomePage() {
   const [liveMatches, upcomingMatches, participant, totalParticipants, topRanking] = await Promise.all([
     prisma.match.findMany({
       where: { status: 'LIVE' },
-      include: { homeTeam: true, awayTeam: true, group: true },
+      include: {
+        homeTeam: true, awayTeam: true, group: true,
+        aiPrediction: { select: { predictedHomeGoals: true, predictedAwayGoals: true, homeWinProbability: true, drawProbability: true, awayWinProbability: true, explanation: true } },
+        predictions: {
+          where: { participant: { userId: session.user?.id ?? '' } },
+          select: { homeScore: true, awayScore: true },
+          take: 1,
+        },
+      },
       orderBy: { kickoffAt: 'asc' },
     }),
     prisma.match.findMany({
@@ -90,75 +98,142 @@ export default async function HomePage() {
               LIVE
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div className="space-y-4">
             {liveMatches.map((match) => (
-              <div key={match.id} className="bg-[#111118] rounded-xl border border-red-500/25 overflow-hidden">
-                {/* Match info */}
-                <Link href={`/partidos/${match.id}`} className="block p-5 hover:bg-red-950/20 transition-all">
-                  <div className="flex items-center justify-between text-xs mb-4">
-                    <span className="text-gray-500">
-                      {match.group ? `Grupo ${match.group.label}` : phaseLabel(match.phase)}
-                    </span>
-                    <span className="flex items-center gap-1 text-red-400 font-bold animate-pulse">
-                      <Zap className="w-3 h-3" /> EN VIVO
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 flex items-center justify-end gap-2">
-                      <span className="text-sm font-bold text-white truncate">{match.homeTeam.name}</span>
-                      <TeamFlag team={match.homeTeam} size="md" />
+              <div key={match.id} className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+
+                {/* ── LEFT: Live match card (3/5) ── */}
+                <div className="lg:col-span-3 bg-[#0d0d14] rounded-2xl border border-red-500/25 overflow-hidden flex flex-col">
+                  {/* Poster banner */}
+                  {match.posterUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={match.posterUrl} alt="" className="w-full h-28 object-cover opacity-50" />
+                  )}
+
+                  {/* Score block */}
+                  <Link href={`/partidos/${match.id}`} className="flex-1 block px-6 py-5 hover:bg-red-950/10 transition-all">
+                    <div className="flex items-center justify-between text-xs mb-5">
+                      <span className="text-gray-500 font-medium">
+                        {match.group ? `Grupo ${match.group.label}` : phaseLabel(match.phase)}
+                        {match.stadium && <span className="ml-2 text-gray-700">· {match.city}</span>}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-red-400 font-bold">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                        EN VIVO
+                      </span>
                     </div>
-                    <div className="text-center px-3">
-                      <div className="text-2xl font-bold text-white tabular-nums font-mono">
-                        {match.homeScore ?? 0}–{match.awayScore ?? 0}
+
+                    <div className="flex items-center gap-4">
+                      {/* Home */}
+                      <div className="flex-1 flex flex-col items-center gap-2">
+                        <TeamFlag team={match.homeTeam} size="lg" />
+                        <span className="text-sm font-bold text-white text-center">{match.homeTeam.name}</span>
+                      </div>
+
+                      {/* Score */}
+                      <div className="text-center px-2">
+                        <div className="text-5xl font-black text-white tabular-nums font-mono tracking-tight">
+                          {match.homeScore ?? 0}<span className="text-gray-700 mx-1">:</span>{match.awayScore ?? 0}
+                        </div>
+                        <div className="text-xs text-red-400 font-bold mt-1 tracking-widest">⚡ LIVE</div>
+                      </div>
+
+                      {/* Away */}
+                      <div className="flex-1 flex flex-col items-center gap-2">
+                        <TeamFlag team={match.awayTeam} size="lg" />
+                        <span className="text-sm font-bold text-white text-center">{match.awayTeam.name}</span>
                       </div>
                     </div>
-                    <div className="flex-1 flex items-center justify-start gap-2">
-                      <TeamFlag team={match.awayTeam} size="md" />
-                      <span className="text-sm font-bold text-white truncate">{match.awayTeam.name}</span>
+                  </Link>
+
+                  {/* Watch buttons */}
+                  <div className="border-t border-red-500/15 px-6 py-3 flex flex-wrap gap-2 bg-black/20">
+                    <a href={youtubeSearchUrl(match.homeTeam.name, match.awayTeam.name)} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold transition-all shadow-lg shadow-red-600/25">
+                      <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                      Ver ahora
+                    </a>
+                    {['TUDN', 'Telemundo', 'FIFA TV'].map((ch, i) => (
+                      <a key={ch} href={['https://www.youtube.com/@tudnusa/streams','https://www.youtube.com/@TelemundoDeportes/streams','https://www.youtube.com/@fifatv/streams'][i]}
+                        target="_blank" rel="noopener noreferrer"
+                        className="px-3 py-2 rounded-lg bg-[#1a1a24] hover:bg-[#252535] border border-[#2e2e3e] hover:border-red-500/30 text-gray-400 hover:text-white text-xs font-medium transition-all">
+                        {ch}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── RIGHT: Match Center panel (2/5) ── */}
+                <div className="lg:col-span-2 flex flex-col gap-3">
+
+                  {/* AI Prediction */}
+                  {match.aiPrediction && (
+                    <div className="bg-[#0d0d14] rounded-2xl border border-[#1e1e2e] p-4 flex-shrink-0">
+                      <div className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-3">
+                        ✦ Predicción IA
+                      </div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-xs text-gray-400 flex-1 text-right">{match.homeTeam.name}</span>
+                        <span className="text-xl font-black text-white tabular-nums font-mono bg-[#1a1a28] px-3 py-1 rounded-lg">
+                          {match.aiPrediction.predictedHomeGoals}–{match.aiPrediction.predictedAwayGoals}
+                        </span>
+                        <span className="text-xs text-gray-400 flex-1">{match.awayTeam.name}</span>
+                      </div>
+                      {/* Probability bars */}
+                      <div className="space-y-1.5">
+                        {[
+                          { label: match.homeTeam.name, pct: match.aiPrediction.homeWinProbability, color: 'bg-green-500' },
+                          { label: 'Empate', pct: match.aiPrediction.drawProbability, color: 'bg-gray-500' },
+                          { label: match.awayTeam.name, pct: match.aiPrediction.awayWinProbability, color: 'bg-blue-500' },
+                        ].map(({ label, pct, color }) => (
+                          <div key={label} className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600 w-16 truncate text-right">{label}</span>
+                            <div className="flex-1 h-1.5 bg-[#1a1a28] rounded-full overflow-hidden">
+                              <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs font-bold text-gray-400 w-8">{pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* My prediction */}
+                  {match.predictions.length > 0 && (
+                    <div className="bg-green-500/10 rounded-2xl border border-green-500/20 px-4 py-3">
+                      <div className="text-xs text-green-500 font-semibold uppercase tracking-widest mb-1.5">
+                        Tu pronóstico
+                      </div>
+                      <div className="text-2xl font-black text-white tabular-nums font-mono text-center">
+                        {match.predictions[0].homeScore}–{match.predictions[0].awayScore}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Broadcast channels */}
+                  <div className="bg-[#0d0d14] rounded-2xl border border-[#1e1e2e] p-4">
+                    <div className="text-xs text-gray-500 font-semibold uppercase tracking-widest mb-3">
+                      📺 Canales de transmisión
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { name: 'TUDN',       url: 'https://www.youtube.com/@tudnusa/streams',               flag: '🇲🇽' },
+                        { name: 'Telemundo',  url: 'https://www.youtube.com/@TelemundoDeportes/streams',    flag: '🇲🇽' },
+                        { name: 'FIFA TV',    url: 'https://www.youtube.com/@fifatv/streams',                flag: '🌍' },
+                        { name: 'Fox Sports', url: 'https://www.youtube.com/results?search_query=Fox+Sports+World+Cup+2026+live', flag: '🇺🇸' },
+                      ].map(ch => (
+                        <a key={ch.name} href={ch.url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#131320] hover:bg-[#1e1e2e] border border-[#2e2e3e] hover:border-red-500/30 transition-all group">
+                          <span className="text-base">{ch.flag}</span>
+                          <span className="text-xs font-semibold text-gray-400 group-hover:text-white transition-colors">{ch.name}</span>
+                          <svg className="w-3 h-3 ml-auto text-gray-700 group-hover:text-red-400 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        </a>
+                      ))}
                     </div>
                   </div>
-                  {match.stadium && (
-                    <p className="text-xs text-gray-600 text-center mt-3">{match.stadium}, {match.city}</p>
-                  )}
-                </Link>
-
-                {/* Watch live buttons */}
-                <div className="border-t border-red-500/20 px-5 py-3 flex flex-wrap gap-2 bg-red-950/10">
-                  <a
-                    href={youtubeSearchUrl(match.homeTeam.name, match.awayTeam.name)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-bold transition-all shadow-lg shadow-red-600/30"
-                  >
-                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                    Ver ahora
-                  </a>
-                  <a
-                    href="https://www.youtube.com/@tudnusa/streams"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] text-gray-300 hover:text-white text-xs font-medium transition-all"
-                  >
-                    TUDN
-                  </a>
-                  <a
-                    href="https://www.youtube.com/@TelemundoDeportes/streams"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] text-gray-300 hover:text-white text-xs font-medium transition-all"
-                  >
-                    Telemundo
-                  </a>
-                  <a
-                    href="https://www.youtube.com/@fifatv/streams"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a28] hover:bg-[#2a2a38] border border-[#2e2e3e] text-gray-300 hover:text-white text-xs font-medium transition-all"
-                  >
-                    FIFA TV
-                  </a>
                 </div>
+
               </div>
             ))}
           </div>
