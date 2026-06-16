@@ -7,7 +7,8 @@ import { prisma } from '@/lib/db'
 //     -H "Authorization: Bearer <AUTH_SECRET>"
 export async function POST(req: Request) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token || token !== process.env.AUTH_SECRET) {
+  const validToken = process.env.FIX_DATA_SECRET || process.env.AUTH_SECRET
+  if (!token || token !== validToken) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
