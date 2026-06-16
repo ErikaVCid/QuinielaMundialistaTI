@@ -17,7 +17,7 @@ const navItems = [
   { href: '/posiciones-grupo', label: 'Por Grupo', icon: BarChart2 },
   { href: '/pronosticos', label: 'Pronósticos', icon: Target },
   { href: '/posiciones', label: 'Posiciones', icon: Trophy },
-  { href: '/posiciones', label: 'Comunidad', icon: Users },
+  { href: '/comunidad', label: 'Comunidad', icon: Users },
   { href: '/noticias', label: 'Noticias', icon: Newspaper },
 ]
 
@@ -48,7 +48,7 @@ export function Navigation() {
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ href, label, icon: Icon }) => (
           <Link
-            key={href}
+            key={label}
             href={href}
             onClick={() => setMobileOpen(false)}
             className={cn(
