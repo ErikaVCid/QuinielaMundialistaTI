@@ -27,7 +27,7 @@ export function Navigation() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href)
+    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
 
   const navContent = (
     <div className="flex flex-col h-full">
