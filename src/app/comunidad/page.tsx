@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
-import { Star, Target, Users } from 'lucide-react'
+import { cn, formatMatchTime } from '@/lib/utils'
+import { Star, Target, Users, Trophy, CheckCircle2, XCircle } from 'lucide-react'
 
 const GRADIENTS = [
   'from-green-600 to-emerald-400',
@@ -24,6 +24,7 @@ export default async function ComunidadPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
+  // Participants ranked
   const participants = await prisma.participant.findMany({
     include: {
       user: { select: { name: true } },
@@ -45,8 +46,36 @@ export default async function ComunidadPage() {
   const topPoints = ranked[0]?.totalPoints ?? 0
   const totalPredictions = participants.reduce((s, p) => s + p._count.predictions, 0)
 
+  // Finished matches with all predictions
+  const finishedMatches = await prisma.match.findMany({
+    where: { status: 'FINISHED', homeScore: { not: null }, awayScore: { not: null } },
+    include: {
+      homeTeam: { select: { name: true, code: true, flag: true } },
+      awayTeam: { select: { name: true, code: true, flag: true } },
+      predictions: {
+        include: { participant: { select: { id: true, displayName: true } } },
+      },
+    },
+    orderBy: { kickoffAt: 'asc' },
+  })
+
+  // Build a lookup: matchId → participantId → prediction
+  const predMap = new Map<string, Map<string, { homeScore: number; awayScore: number; points: number; isLocked: boolean }>>()
+  for (const match of finishedMatches) {
+    const byParticipant = new Map<string, { homeScore: number; awayScore: number; points: number; isLocked: boolean }>()
+    for (const pred of match.predictions) {
+      byParticipant.set(pred.participantId, {
+        homeScore: pred.homeScore,
+        awayScore: pred.awayScore,
+        points: pred.points ?? 0,
+        isLocked: pred.isLocked,
+      })
+    }
+    predMap.set(match.id, byParticipant)
+  }
+
   return (
-    <div className="pt-16 md:pt-0 p-4 md:p-8 max-w-5xl space-y-6">
+    <div className="pt-16 md:pt-0 p-4 md:p-8 max-w-6xl space-y-8">
 
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -69,92 +98,213 @@ export default async function ComunidadPage() {
         )}
       </div>
 
-      {/* User cards grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-        {ranked.map((p) => {
-          const isMe = p.userId === session.user?.id
-          const grad = avatarGradient(p.displayName)
-          const isTop3 = p.rank <= 3
-          const rankColors = ['text-amber-400', 'text-gray-300', 'text-orange-400']
-          const rankRings  = ['ring-amber-400/50', 'ring-gray-400/40', 'ring-orange-400/40']
-          const cardBg = isMe
-            ? 'bg-green-500/10 border-green-500/25 ring-1 ring-green-500/30'
-            : isTop3
-            ? ['bg-amber-500/10 border-amber-500/20', 'bg-gray-500/5 border-gray-500/20', 'bg-orange-500/5 border-orange-500/20'][p.rank - 1]
-            : 'bg-[#111118] border-[#1e1e2e] hover:border-[#2e2e3e]'
+      {/* ── Tabla de posiciones ── */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-amber-400" /> Tabla de Posiciones
+        </h2>
+        <div className="overflow-x-auto rounded-2xl border border-[#1e1e2e]">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#1e1e2e] text-gray-500 text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-3 w-10">#</th>
+                <th className="text-left px-4 py-3">Participante</th>
+                <th className="text-right px-4 py-3">Pts</th>
+                <th className="text-right px-4 py-3">
+                  <Star className="w-3 h-3 inline text-amber-400" /> Exactos
+                </th>
+                <th className="text-right px-4 py-3">
+                  <Target className="w-3 h-3 inline text-green-400" /> Resultados
+                </th>
+                <th className="text-right px-4 py-3 hidden sm:table-cell">Pronósticos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranked.map((p) => {
+                const isMe = p.userId === session.user?.id
+                const rankColors = ['text-amber-400', 'text-gray-300', 'text-orange-400']
+                const grad = avatarGradient(p.displayName)
+                const posChange = p.position !== null && p.positionPrev !== null
+                  ? p.positionPrev - p.position : 0
 
-          return (
-            <Link key={p.id} href={`/posiciones/${p.id}`} className="group">
-              <div className={cn(
-                'rounded-2xl border p-4 text-center transition-all group-hover:scale-[1.02] group-hover:shadow-lg',
-                cardBg
-              )}>
-                {/* Rank */}
-                <div className="flex items-center justify-between mb-3">
-                  <span className={cn('text-lg font-black',
-                    isMe ? 'text-green-400' : (rankColors[p.rank - 1] ?? 'text-gray-500')
-                  )}>#{p.rank}</span>
-                  {p.rank === 1 && <span className="text-base">🥇</span>}
-                  {p.rank === 2 && <span className="text-base">🥈</span>}
-                  {p.rank === 3 && <span className="text-base">🥉</span>}
-                  {isMe && p.rank > 3 && (
-                    <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">tú</span>
-                  )}
-                </div>
+                return (
+                  <tr key={p.id}
+                    className={cn(
+                      'border-b border-[#1e1e2e] last:border-0 transition-colors',
+                      isMe ? 'bg-green-500/8' : 'hover:bg-[#111118]'
+                    )}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <span className={cn('font-black text-base',
+                          isMe ? 'text-green-400' : (rankColors[p.rank - 1] ?? 'text-gray-400')
+                        )}>
+                          {p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : `#${p.rank}`}
+                        </span>
+                        {posChange > 0 && <span className="text-green-400 text-xs">▲{posChange}</span>}
+                        {posChange < 0 && <span className="text-red-400 text-xs">▼{Math.abs(posChange)}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link href={`/posiciones/${p.id}`} className="flex items-center gap-2 group">
+                        <div className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white shrink-0',
+                          `bg-gradient-to-br ${grad}`
+                        )}>
+                          {p.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className={cn('font-semibold group-hover:underline',
+                            isMe ? 'text-green-400' : 'text-white'
+                          )}>
+                            {p.displayName}
+                          </span>
+                          {isMe && <span className="ml-1.5 text-xs bg-green-500/20 text-green-400 px-1 py-0.5 rounded">tú</span>}
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={cn('text-lg font-black',
+                        isMe ? 'text-green-400' :
+                        p.rank === 1 ? 'text-amber-400' :
+                        p.rank === 2 ? 'text-gray-300' :
+                        p.rank === 3 ? 'text-orange-400' : 'text-white'
+                      )}>
+                        {p.totalPoints}
+                      </span>
+                      <span className="text-xs text-gray-600 ml-0.5">pts</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-amber-400 font-bold">{p.exactHits}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-green-400 font-bold">{p.resultHits}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right hidden sm:table-cell text-gray-500">
+                      {p._count.predictions}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-                {/* Avatar */}
-                <div className={cn(
-                  'w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center',
-                  `bg-gradient-to-br ${grad}`,
-                  'text-2xl font-black text-white shadow-lg',
-                  isTop3 ? `ring-2 ring-offset-2 ring-offset-[#0a0a0f] ${rankRings[p.rank - 1]}` : '',
-                )}>
-                  {p.displayName.charAt(0).toUpperCase()}
-                </div>
+      {/* ── Tabla de pronósticos vs resultados ── */}
+      {finishedMatches.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-400" /> Pronósticos vs Resultados
+          </h2>
+          <div className="overflow-x-auto rounded-2xl border border-[#1e1e2e]">
+            <table className="text-sm min-w-max w-full">
+              <thead>
+                <tr className="border-b border-[#1e1e2e] text-gray-500 text-xs uppercase tracking-wider">
+                  <th className="text-left px-4 py-3 sticky left-0 bg-[#0d0d15] z-10 min-w-[140px]">
+                    Participante
+                  </th>
+                  {finishedMatches.map(m => (
+                    <th key={m.id} className="text-center px-3 py-3 min-w-[88px]">
+                      <div className="text-white font-bold">{m.homeTeam.code}–{m.awayTeam.code}</div>
+                      <div className="text-green-400 font-black">{m.homeScore}–{m.awayScore}</div>
+                      <div className="text-gray-600 text-[10px]">{formatMatchTime(m.kickoffAt)}</div>
+                    </th>
+                  ))}
+                  <th className="text-right px-4 py-3 sticky right-0 bg-[#0d0d15] z-10">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ranked.map((p) => {
+                  const isMe = p.userId === session.user?.id
+                  let rowPoints = 0
 
-                {/* Name */}
-                <div className={cn('text-sm font-bold truncate mb-1',
-                  isMe ? 'text-green-400' : 'text-white'
-                )}>
-                  {p.displayName}
-                </div>
+                  return (
+                    <tr key={p.id}
+                      className={cn(
+                        'border-b border-[#1e1e2e] last:border-0',
+                        isMe ? 'bg-green-500/8' : 'hover:bg-[#111118]'
+                      )}>
+                      {/* Name cell */}
+                      <td className={cn(
+                        'px-4 py-3 sticky left-0 z-10 font-semibold',
+                        isMe ? 'bg-green-500/10 text-green-400' : 'bg-[#0a0a0f] text-white'
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 font-mono w-5">#{p.rank}</span>
+                          <span className="truncate max-w-[100px]">{p.displayName}</span>
+                        </div>
+                      </td>
 
-                {/* Points */}
-                <div className={cn('text-2xl font-black mb-2',
-                  isMe ? 'text-green-400' :
-                  p.rank === 1 ? 'text-amber-400' :
-                  p.rank === 2 ? 'text-gray-300' :
-                  p.rank === 3 ? 'text-orange-400' : 'text-white'
-                )}>
-                  {p.totalPoints}
-                  <span className="text-xs font-medium text-gray-500 ml-0.5">pts</span>
-                </div>
+                      {/* Prediction cells */}
+                      {finishedMatches.map(m => {
+                        const pred = predMap.get(m.id)?.get(p.id)
+                        const pts = pred?.points ?? 0
+                        rowPoints += pts
 
-                {/* Mini stats */}
-                <div className="flex justify-center gap-3 text-xs">
-                  <span className="flex items-center gap-0.5 text-amber-400">
-                    <Star className="w-2.5 h-2.5" />{p.exactHits}
-                  </span>
-                  <span className="flex items-center gap-0.5 text-green-400">
-                    <Target className="w-2.5 h-2.5" />{p.resultHits}
-                  </span>
-                  <span className="text-gray-600">{p._count.predictions}⚽</span>
-                </div>
+                        if (!pred) {
+                          return (
+                            <td key={m.id} className="px-3 py-3 text-center">
+                              <span className="text-gray-700 text-xs">—</span>
+                            </td>
+                          )
+                        }
 
-                {/* Progress vs leader */}
-                {topPoints > 0 && (
-                  <div className="mt-3 h-1 bg-[#1a1a28] rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full', isMe ? 'bg-green-500' : 'bg-[#3a3a4a]')}
-                      style={{ width: `${Math.round((p.totalPoints / topPoints) * 100)}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </Link>
-          )
-        })}
-      </div>
+                        const isExact = pred.homeScore === m.homeScore && pred.awayScore === m.awayScore
+                        const isCorrectResult = !isExact &&
+                          Math.sign(pred.homeScore - pred.awayScore) === Math.sign((m.homeScore ?? 0) - (m.awayScore ?? 0))
+                        const isWrong = !isExact && !isCorrectResult
+
+                        return (
+                          <td key={m.id} className="px-3 py-3 text-center">
+                            <div className={cn(
+                              'inline-flex flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-xs font-bold min-w-[60px]',
+                              isExact       ? 'bg-amber-500/15 text-amber-300' :
+                              isCorrectResult ? 'bg-green-500/15 text-green-400' :
+                              'bg-red-500/10 text-red-400'
+                            )}>
+                              <span>{pred.homeScore}–{pred.awayScore}</span>
+                              <span className="text-[10px] font-medium flex items-center gap-0.5">
+                                {isExact && <><Star className="w-2.5 h-2.5" />{pts}pts</>}
+                                {isCorrectResult && <><CheckCircle2 className="w-2.5 h-2.5" />{pts}pts</>}
+                                {isWrong && <><XCircle className="w-2.5 h-2.5" />0pts</>}
+                              </span>
+                            </div>
+                          </td>
+                        )
+                      })}
+
+                      {/* Total */}
+                      <td className={cn(
+                        'px-4 py-3 text-right sticky right-0 z-10 font-black',
+                        isMe ? 'bg-green-500/10 text-green-400' : 'bg-[#0a0a0f] text-white'
+                      )}>
+                        {rowPoints}
+                        <span className="text-xs text-gray-600 ml-0.5">pts</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Legend */}
+          <div className="flex items-center gap-4 mt-3 text-xs text-gray-500 flex-wrap">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-amber-500/30 inline-block" />
+              <Star className="w-3 h-3 text-amber-400" /> Marcador exacto
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-green-500/20 inline-block" />
+              <CheckCircle2 className="w-3 h-3 text-green-400" /> Resultado correcto
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-red-500/15 inline-block" />
+              <XCircle className="w-3 h-3 text-red-400" /> Incorrecto
+            </span>
+            <span className="text-gray-600">— Sin pronóstico</span>
+          </div>
+        </section>
+      )}
 
       <div className="text-center">
         <Link href="/posiciones" className="text-sm text-green-400 hover:text-green-300 transition-colors">

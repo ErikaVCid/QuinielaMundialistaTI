@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { TeamFlag } from '@/components/team-flag'
-import { Loader2, Save, RefreshCw } from 'lucide-react'
+import { Loader2, Save, RefreshCw, Calculator } from 'lucide-react'
 
 interface MatchData {
   id: string
@@ -18,6 +18,20 @@ export default function ResultadosPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [recalculating, setRecalculating] = useState(false)
+
+  async function recalculateAll() {
+    setRecalculating(true)
+    const res = await fetch('/api/admin/recalculate', { method: 'POST' })
+    const data = await res.json()
+    if (res.ok) {
+      setMessage(`✓ Recalculado: ${data.matchesScored} partidos, ${data.predictionsScored} pronósticos, ${data.participants} participantes`)
+    } else {
+      setMessage('Error al recalcular')
+    }
+    setRecalculating(false)
+    setTimeout(() => setMessage(''), 5000)
+  }
 
   async function loadMatches() {
     setLoading(true)
@@ -51,11 +65,18 @@ export default function ResultadosPage() {
           <h1 className="text-2xl font-bold text-white mb-1">Cargar Resultados</h1>
           <p className="text-gray-400 text-sm">Actualiza marcadores y calcula puntos automáticamente</p>
         </div>
-        <button onClick={loadMatches} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-all disabled:opacity-50">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Cargar partidos
-        </button>
+        <div className="flex gap-2">
+          <button onClick={recalculateAll} disabled={recalculating}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-all disabled:opacity-50">
+            {recalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
+            Recalcular puntos
+          </button>
+          <button onClick={loadMatches} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-all disabled:opacity-50">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Cargar partidos
+          </button>
+        </div>
       </div>
 
       {message && (
