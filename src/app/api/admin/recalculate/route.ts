@@ -5,14 +5,10 @@ import { calcPoints, DEFAULT_SCORING } from '@/lib/scoring'
 
 // Recalculates points for all finished matches from scratch.
 // Resets participant totals, scores all predictions, rebuilds rankings.
-export async function POST(req: Request) {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '').trim()
-  const fixToken = process.env.FIX_DATA_SECRET
-  if (!(fixToken && token === fixToken)) {
-    const session = await auth()
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
-    }
+export async function POST() {
+  const session = await auth()
+  if (!session?.user || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 
   const scoringRule = await prisma.scoringRule.findFirst({ where: { isActive: true } })
