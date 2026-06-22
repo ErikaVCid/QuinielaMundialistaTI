@@ -97,12 +97,32 @@ export class WorldCup26Provider implements FootballDataProvider {
   }
 
   private async req<T>(path: string): Promise<T> {
-    const res = await fetch(`${WorldCup26Provider.BASE_URL}${path}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-      next: { revalidate: 60 },
+    // worldcup26.ir has TLS compatibility issues with Node.js fetch/undici.
+    // Use node:https with rejectUnauthorized:false as a reliable fallback.
+    const https = await import('node:https')
+    return new Promise<T>((resolve, reject) => {
+      const options = {
+        hostname: 'worldcup26.ir',
+        path,
+        method: 'GET',
+        headers: { Authorization: `Bearer ${this.token}` },
+        rejectUnauthorized: false,
+      }
+      const req = https.request(options, (res) => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`worldcup26.ir ${res.statusCode} ${path}`))
+          return
+        }
+        let data = ''
+        res.on('data', (chunk) => { data += chunk })
+        res.on('end', () => {
+          try { resolve(JSON.parse(data) as T) }
+          catch (e) { reject(new Error(`JSON parse: ${String(e)}`)) }
+        })
+      })
+      req.on('error', reject)
+      req.end()
     })
-    if (!res.ok) throw new Error(`worldcup26.ir ${res.status} ${path}`)
-    return res.json() as Promise<T>
   }
 
   // Parse "MM/DD/YYYY HH:MM" → UTC Date
