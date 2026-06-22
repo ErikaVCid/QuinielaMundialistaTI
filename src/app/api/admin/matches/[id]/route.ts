@@ -13,7 +13,7 @@ export async function PATCH(
   }
 
   const { id } = await params
-  const { homeScore, awayScore, status } = await req.json()
+  const { homeScore, awayScore, status, kickoffAt } = await req.json()
 
   await prisma.match.update({
     where: { id },
@@ -21,6 +21,7 @@ export async function PATCH(
       homeScore: homeScore ?? undefined,
       awayScore: awayScore ?? undefined,
       status: status ?? undefined,
+      kickoffAt: kickoffAt ? new Date(kickoffAt) : undefined,
     },
   })
 
