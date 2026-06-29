@@ -1,8 +1,13 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { syncWorldCup26Live } from '@/lib/worldcup26-sync'
 
 export const dynamic = 'force-dynamic'
+
+// Module-level throttle: only one live sync per minute across all SSE connections
+let lastLiveSync = 0
+const LIVE_SYNC_INTERVAL_MS = 60_000
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -50,6 +55,13 @@ export async function GET(req: NextRequest) {
 
       const interval = setInterval(async () => {
         try {
+          // If any match is LIVE, sync scores from worldcup26.ir (max once per minute)
+          const hasLive = await prisma.match.count({ where: { status: 'LIVE' } })
+          if (hasLive > 0 && Date.now() - lastLiveSync >= LIVE_SYNC_INTERVAL_MS) {
+            lastLiveSync = Date.now()
+            syncWorldCup26Live().catch(() => { /* non-blocking */ })
+          }
+
           const matches = await getMatches()
           const goals: { matchId: string; homeTeam: string; awayTeam: string; homeScore: number | null; awayScore: number | null }[] = []
 
