@@ -3,6 +3,7 @@ dotenv.config({ path: '.env.local' })
 
 import { PrismaClient, Phase } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
+import { fromZonedTime } from 'date-fns-tz'
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
@@ -28,11 +29,33 @@ interface WC26Game {
 }
 interface WC26Stadium { id: string; name_en: string; city_en: string; country_en: string }
 
-function parseDate(d: string): Date {
-  const [date, time] = d.split(' ')
-  const [mm, dd, yyyy] = date.split('/')
-  const [hh, min] = time.split(':')
-  return new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh, +min))
+// Stadium ID → IANA timezone (local time at each venue)
+const STADIUM_TZ: Record<string, string> = {
+  '1':  'America/Mexico_City',  // Mexico City
+  '2':  'America/Mexico_City',  // Guadalajara
+  '3':  'America/Monterrey',    // Monterrey
+  '4':  'America/Chicago',      // Dallas
+  '5':  'America/Chicago',      // Houston
+  '6':  'America/Chicago',      // Kansas City
+  '7':  'America/New_York',     // Atlanta
+  '8':  'America/New_York',     // Miami
+  '9':  'America/New_York',     // Boston
+  '10': 'America/New_York',     // Philadelphia
+  '11': 'America/New_York',     // New York/New Jersey
+  '12': 'America/Toronto',      // Toronto
+  '13': 'America/Vancouver',    // Vancouver
+  '14': 'America/Los_Angeles',  // Seattle
+  '15': 'America/Los_Angeles',  // San Francisco
+  '16': 'America/Los_Angeles',  // Los Angeles
+}
+
+function parseDate(d: string, stadiumId: string): Date {
+  const [datePart, timePart] = d.split(' ')
+  const [mm, dd, yyyy] = datePart.split('/')
+  const [hh, min] = timePart.split(':')
+  const iso = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min}:00`
+  const tz = STADIUM_TZ[stadiumId] ?? 'America/Mexico_City'
+  return fromZonedTime(iso, tz)
 }
 
 function mapStatus(g: WC26Game): 'SCHEDULED' | 'LIVE' | 'FINISHED' {
@@ -111,6 +134,7 @@ async function main() {
     await prisma.match.upsert({
       where: { externalId: `wc26-${g.id}` },
       update: {
+        kickoffAt: parseDate(g.local_date, g.stadium_id),
         status: mapStatus(g),
         homeScore: homeScore ?? undefined,
         awayScore: awayScore ?? undefined,
@@ -122,7 +146,7 @@ async function main() {
         externalId: `wc26-${g.id}`,
         homeTeamId,
         awayTeamId,
-        kickoffAt: parseDate(g.local_date),
+        kickoffAt: parseDate(g.local_date, g.stadium_id),
         stadium: stadium?.name_en,
         city: stadium?.city_en,
         phase: mapPhase(g.type),

@@ -1,4 +1,5 @@
 import { Phase } from '@prisma/client'
+import { fromZonedTime } from 'date-fns-tz'
 
 export interface MatchData {
   externalId: string
@@ -125,12 +126,33 @@ export class WorldCup26Provider implements FootballDataProvider {
     })
   }
 
-  // Parse "MM/DD/YYYY HH:MM" → UTC Date
-  private parseDate(localDate: string): Date {
+  private static readonly STADIUM_TZ: Record<string, string> = {
+    '1':  'America/Mexico_City',
+    '2':  'America/Mexico_City',
+    '3':  'America/Monterrey',
+    '4':  'America/Chicago',
+    '5':  'America/Chicago',
+    '6':  'America/Chicago',
+    '7':  'America/New_York',
+    '8':  'America/New_York',
+    '9':  'America/New_York',
+    '10': 'America/New_York',
+    '11': 'America/New_York',
+    '12': 'America/Toronto',
+    '13': 'America/Vancouver',
+    '14': 'America/Los_Angeles',
+    '15': 'America/Los_Angeles',
+    '16': 'America/Los_Angeles',
+  }
+
+  // Parse "MM/DD/YYYY HH:MM" in venue local time → UTC Date
+  private parseDate(localDate: string, stadiumId: string): Date {
     const [datePart, timePart] = localDate.split(' ')
     const [mm, dd, yyyy] = datePart.split('/')
     const [hh, min] = timePart.split(':')
-    return new Date(Date.UTC(+yyyy, +mm - 1, +dd, +hh, +min))
+    const iso = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${min}:00`
+    const tz = WorldCup26Provider.STADIUM_TZ[stadiumId] ?? 'America/Mexico_City'
+    return fromZonedTime(iso, tz)
   }
 
   private mapStatus(game: WC26Game): MatchData['status'] {
@@ -191,7 +213,7 @@ export class WorldCup26Provider implements FootballDataProvider {
         awayTeamCode: awayCode,
         homeTeamLabel: game.home_team_label,
         awayTeamLabel: game.away_team_label,
-        kickoffAt: this.parseDate(game.local_date),
+        kickoffAt: this.parseDate(game.local_date, game.stadium_id),
         stadium: stadium?.name_en,
         city: stadium?.city_en,
         country: stadium?.country_en,
