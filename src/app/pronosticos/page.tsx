@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import Link from 'next/link'
 import { formatMatchTime, isMatchLocked } from '@/lib/utils'
-import { Lock, Clock } from 'lucide-react'
+import { Lock, Clock, Star, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -125,14 +125,23 @@ export default async function PronosticosPage() {
                   const isFinished = match.status === 'FINISHED'
                   const isLive = match.status === 'LIVE'
 
+                  const isExact = isFinished && prediction &&
+                    prediction.homeScore === match.homeScore && prediction.awayScore === match.awayScore
+                  const isCorrect = isFinished && prediction && !isExact &&
+                    Math.sign(prediction.homeScore - prediction.awayScore) === Math.sign((match.homeScore ?? 0) - (match.awayScore ?? 0))
+                  const isWrong = isFinished && prediction && !isExact && !isCorrect
+
                   return (
                     <Link key={match.id} href={`/partidos/${match.id}`} className="block group">
                       <div className={cn(
                         'rounded-xl border px-4 py-3 transition-all grid items-center gap-2',
                         'group-hover:border-green-500/20 group-hover:bg-[#131320]',
-                        isLive     ? 'bg-red-950/20 border-red-500/20' :
-                        prediction ? 'bg-[#111118] border-[#1e1e2e]' :
-                                     'bg-[#0f0f17] border-yellow-500/10',
+                        isLive      ? 'bg-red-950/20 border-red-500/20' :
+                        isExact     ? 'bg-amber-500/8 border-amber-500/20' :
+                        isCorrect   ? 'bg-green-500/8 border-green-500/20' :
+                        isWrong     ? 'bg-red-500/5 border-red-500/10' :
+                        prediction  ? 'bg-[#111118] border-[#1e1e2e]' :
+                                      'bg-[#0f0f17] border-yellow-500/10',
                       )}
                       style={{ gridTemplateColumns: '3.5rem 1fr auto 1fr auto' }}
                       >
@@ -162,22 +171,35 @@ export default async function PronosticosPage() {
                         {/* Center: inline prediction or result */}
                         <div className="flex justify-center px-1">
                           {isFinished ? (
-                            <div className="flex flex-col items-center">
-                              {prediction && (
-                                <span className="text-sm font-bold text-white tabular-nums font-mono leading-tight">
-                                  {prediction.homeScore}–{prediction.awayScore}
+                            <div className="flex flex-col items-center gap-0.5">
+                              {prediction ? (
+                                <>
+                                  {/* User prediction */}
+                                  <span className={cn(
+                                    'text-sm font-bold tabular-nums font-mono leading-tight',
+                                    isExact   ? 'text-amber-400' :
+                                    isCorrect ? 'text-green-400' :
+                                    isWrong   ? 'text-red-400'   : 'text-white'
+                                  )}>
+                                    {prediction.homeScore}–{prediction.awayScore}
+                                  </span>
+                                  {/* Real result */}
+                                  {match.homeScore !== null && (
+                                    <span className="text-xs text-gray-500 tabular-nums">
+                                      real: {match.homeScore}–{match.awayScore}
+                                    </span>
+                                  )}
+                                  {/* Outcome icon */}
+                                  <span className="mt-0.5">
+                                    {isExact   && <Star className="w-3 h-3 text-amber-400" />}
+                                    {isCorrect && <CheckCircle2 className="w-3 h-3 text-green-400" />}
+                                    {isWrong   && <XCircle className="w-3 h-3 text-red-400" />}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className={cn('text-sm font-bold tabular-nums font-mono text-white')}>
+                                  {match.homeScore}–{match.awayScore}
                                 </span>
-                              )}
-                              {match.homeScore !== null && (
-                                <span className={cn(
-                                  'text-xs tabular-nums',
-                                  prediction ? 'text-gray-600' : 'text-gray-400 font-bold'
-                                )}>
-                                  {prediction ? `(${match.homeScore}–${match.awayScore})` : `${match.homeScore}–${match.awayScore}`}
-                                </span>
-                              )}
-                              {!prediction && !match.homeScore && (
-                                <span className="text-xs text-gray-600">Fin</span>
                               )}
                             </div>
                           ) : locked ? (
